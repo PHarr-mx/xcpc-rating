@@ -1,0 +1,79 @@
+[
+  {
+    "id": "p20230001",
+    "name": "张三",
+    "handle": "zs",
+    "grade": 2023,
+    "status": "active",
+    "oj_accounts": [
+      { "platform": "codeforces", "handle": "zhangsan_cf", "user_id": "12345678" },
+      { "platform": "atcoder", "handle": "zhangsan_ac" },
+      { "platform": "luogu", "handle": "zhangsan_lg", "user_id": "987654" },
+      { "platform": "nowcoder", "handle": "zhangsan_nc" }
+    ],
+    "aliases": ["张三", "Zhang San"]
+  },
+  {
+    "id": "p20230002",
+    "name": "李四",
+    "handle": "ls",
+    "grade": 2023,
+    "status": "active",
+    "oj_accounts": [
+      { "platform": "codeforces", "handle": "lisi_cf" },
+      { "platform": "luogu", "handle": "lisi_lg" }
+    ]
+  },
+  {
+    "id": "p20230003",
+    "name": "王五",
+    "handle": "ww",
+    "grade": 2023,
+    "status": "active",
+    "oj_accounts": [
+      { "platform": "codeforces", "handle": "wangwu_cf" },
+      { "platform": "atcoder", "handle": "wangwu_ac" }
+    ]
+  },
+  {
+    "id": "p20230101",
+    "name": "赵六",
+    "handle": "zl",
+    "grade": 2023,
+    "status": "active",
+    "oj_accounts": [
+      { "platform": "codeforces", "handle": "zhaoliu_cf" }
+    ]
+  },
+  {
+    "id": "p20220001",
+    "name": "陈七",
+    "handle": "cq",
+    "grade": 2022,
+    "status": "retired",
+    "oj_accounts": [
+      { "platform": "codeforces", "handle": "chenqi_cf" },
+      { "platform": "atcoder", "handle": "chenqi_ac" },
+      { "platform": "nowcoder", "handle": "chenqi_nc" }
+    ],
+    "aliases": ["陈七", "Chen Qi"]
+  },
+  {
+    "id": "p20220002",
+    "name": "周八",
+    "handle": "zb",
+    "grade": 2022,
+    "status": "left",
+    "oj_accounts": [
+      { "platform": "luogu", "handle": "zhouba_lg" }
+    ]
+  },
+  {
+    "id": "p20240001",
+    "name": "吴九",
+    "handle": "wj",
+    "grade": 2024,
+    "status": "active",
+    "oj_accounts": []
+  }
+]

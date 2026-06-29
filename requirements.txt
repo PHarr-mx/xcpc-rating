@@ -1,0 +1,11 @@
+# xcpc-rating Python 依赖
+#
+# 1. 创建 conda 环境（须指定 Python 版本，否则环境为空）:
+#      conda create -n xcpc_rating python=3.13 pip -y
+# 2. 激活并安装（依赖与 CLI 入口见根目录 pyproject.toml）:
+#      conda activate xcpc_rating
+#      pip install -r requirements.txt
+#
+# 或一键: source ./setup_env.sh
+
+-e .[dev]

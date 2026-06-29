@@ -1,0 +1,27 @@
+{
+  "title": "2025 秋季校内 XCPC 邀请赛",
+  "date": "2025-11-16",
+  "contest_type": "icpc_invitational",
+  "format": "team_xcpc",
+  "total_teams": 72,
+  "standings": [
+    {
+      "team_name": "无敌队",
+      "members": ["张三", "李四", "王五"],
+      "rank": 5,
+      "school_rank": 2,
+      "award": "银",
+      "solved": 7,
+      "penalty": 980
+    },
+    {
+      "team_name": "双核驱动",
+      "members": ["陈七", "周八", "赵六"],
+      "rank": 12,
+      "school_rank": 5,
+      "award": "铜",
+      "solved": 5,
+      "penalty": 720
+    }
+  ]
+}

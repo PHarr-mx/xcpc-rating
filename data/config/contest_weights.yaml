@@ -1,0 +1,83 @@
+# 比赛权重配置
+# 基准：100。极少数比赛可在 raw 中用 weight_override 设为 > 100。
+# 详见 docs/design/07-比赛权重.md
+
+version: 1
+
+defaults:
+  baseline: 100
+  allow_above_baseline: true
+
+# 校内训练赛：仅按 division 区分（与 format 无关）
+training_divisions:
+  div1+2:
+    label: 全体队员组
+    weight: 100
+  div1:
+    label: 老队员组
+    weight: 95
+  div2:
+    label: 新队员组
+    weight: 70
+  div3:
+    label: 未入队新生组
+    weight: 60
+
+# 正式比赛：按 contest_type 区分
+formal_types:
+  icpc_regional:
+    label: ICPC 区域赛
+    weight: 100
+  ccpc_national:
+    label: CCPC 国赛
+    weight: 100
+  icpc_invitational:
+    label: ICPC 邀请赛
+    weight: 80
+  ccpc_invitational:
+    label: CCPC 邀请赛
+    weight: 80
+  icpc_online:
+    label: ICPC 网络赛
+    weight: 90
+  ccpc_online:
+    label: CCPC 网络赛
+    weight: 90
+  icpc_provincial:
+    label: ICPC 省赛
+    weight: 70
+  ccpc_provincial:
+    label: CCPC 省赛
+    weight: 70
+  icpc_school:
+    label: ICPC 校赛
+    weight: 50
+  icpc_team_school:
+    label: ICPC 组队校赛
+    weight: 60
+  astar_national:
+    label: 百度之星国赛
+    weight: 90
+  astar_provincial:
+    label: 百度之星省赛
+    weight: 70
+  lanqiao_national:
+    label: 蓝桥杯国赛
+    weight: 80
+  lanqiao_provincial:
+    label: 蓝桥杯省赛
+    weight: 70
+  gplt_national:
+    label: GPLT 国赛
+    weight: 80
+  raicom_national:
+    label: RAICOM 国赛
+    weight: 75
+  raicom_provincial:
+    label: RAICOM 省赛
+    weight: 65
+
+# OJ 权重（参考，算法待定）
+oj:
+  contest_default: 40
+  practice_default: 20

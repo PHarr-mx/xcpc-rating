@@ -1,0 +1,24 @@
+# 数据缓存与构建产物
+data/processed/
+data/public/.staging/
+logs/
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# 环境
+.env
+backend/data/config.yaml
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

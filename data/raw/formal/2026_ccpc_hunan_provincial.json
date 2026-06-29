@@ -1,0 +1,18 @@
+{
+  "title": "2026 CCPC 湖南省赛",
+  "date": "2026-05-18",
+  "contest_type": "ccpc_provincial",
+  "format": "team_xcpc",
+  "total_teams": 95,
+  "standings": [
+    {
+      "team_name": "三大队",
+      "members": ["张三", "李四", "王五"],
+      "rank": 6,
+      "school_rank": 1,
+      "award": "银",
+      "solved": 7,
+      "penalty": 900
+    }
+  ]
+}

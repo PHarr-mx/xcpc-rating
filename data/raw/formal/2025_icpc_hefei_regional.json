@@ -1,0 +1,18 @@
+{
+  "title": "2025 ICPC 合肥区域赛",
+  "date": "2025-11-20",
+  "contest_type": "icpc_regional",
+  "format": "team_xcpc",
+  "total_teams": 120,
+  "standings": [
+    {
+      "team_name": "校内一队",
+      "members": ["张三", "李四", "王五"],
+      "rank": 28,
+      "school_rank": 1,
+      "award": null,
+      "solved": 5,
+      "penalty": 600
+    }
+  ]
+}

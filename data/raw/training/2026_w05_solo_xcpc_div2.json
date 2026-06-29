@@ -1,0 +1,26 @@
+{
+  "title": "第 5 周校内训练 · 个人 XCPC · 新队员",
+  "date": "2026-02-14",
+  "format": "solo_xcpc",
+  "division": "div2",
+  "standings": [
+    {
+      "members": ["张三"],
+      "rank": 3,
+      "solved": 4,
+      "penalty": 60
+    },
+    {
+      "members": ["陈七"],
+      "rank": 1,
+      "solved": 6,
+      "penalty": 40
+    },
+    {
+      "members": ["李四"],
+      "rank": 5,
+      "solved": 3,
+      "penalty": 90
+    }
+  ]
+}

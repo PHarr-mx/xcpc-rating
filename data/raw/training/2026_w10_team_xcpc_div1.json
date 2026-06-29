@@ -1,0 +1,22 @@
+{
+  "title": "第 10 周校内训练 · 组队 XCPC · 老队员",
+  "date": "2026-03-06",
+  "format": "team_xcpc",
+  "division": "div1",
+  "standings": [
+    {
+      "team_name": "老将队",
+      "members": ["陈七", "周八", "赵六"],
+      "rank": 1,
+      "solved": 6,
+      "penalty": 100
+    },
+    {
+      "team_name": "三大队",
+      "members": ["张三", "李四", "王五"],
+      "rank": 2,
+      "solved": 5,
+      "penalty": 130
+    }
+  ]
+}

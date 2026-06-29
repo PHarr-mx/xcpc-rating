@@ -1,0 +1,32 @@
+[project]
+name = "xcpc-rating"
+version = "0.1.0"
+description = "XCPC rating — backend packages and CLIs"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+xcpc-player = "player.cli:main"
+# 未来在此统一注册，例如:
+# xcpc-data = "xcpc_data.cli:main"
+# xcpc-site = "xcpc_site.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["player", "utils"]
+package-dir = { "player" = "backend/data/player", "utils" = "backend/utils" }
+
+[tool.pytest.ini_options]
+testpaths = ["backend/data/tests", "backend/utils/tests"]
+pythonpath = ["backend/data"]
