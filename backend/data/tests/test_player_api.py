@@ -22,7 +22,6 @@ def test_api_functions_delegate_to_service(temp_store):
 def test_api_accepts_per_call_store(temp_store):
     other_store = PlayerStore(
         raw_path=temp_store.raw_path.parent / "other.json",
-        processed_path=temp_store.processed_path.parent / "other_processed.json",
         repo_root=temp_store.raw_path.parent,
     )
     other_store.raw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -33,6 +32,6 @@ def test_api_accepts_per_call_store(temp_store):
         store=other_store,
         today=date(2026, 1, 1),
     )
-    assert created.id == "p2024001"
+    assert created.id == "p001"
     assert list_players(store=other_store)[0].id == created.id
     assert list_players(store=temp_store) == []

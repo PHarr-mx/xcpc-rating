@@ -1,79 +1,170 @@
 [
   {
-    "id": "p20230001",
-    "name": "张三",
-    "handle": "zs",
-    "grade": 2023,
+    "name": "刘家乐",
+    "grade": 0,
     "status": "active",
-    "oj_accounts": [
-      { "platform": "codeforces", "handle": "zhangsan_cf", "user_id": "12345678" },
-      { "platform": "atcoder", "handle": "zhangsan_ac" },
-      { "platform": "luogu", "handle": "zhangsan_lg", "user_id": "987654" },
-      { "platform": "nowcoder", "handle": "zhangsan_nc" }
-    ],
-    "aliases": ["张三", "Zhang San"]
+    "oj_accounts": [],
+    "id": "p001"
   },
   {
-    "id": "p20230002",
-    "name": "李四",
-    "handle": "ls",
-    "grade": 2023,
-    "status": "active",
-    "oj_accounts": [
-      { "platform": "codeforces", "handle": "lisi_cf" },
-      { "platform": "luogu", "handle": "lisi_lg" }
-    ]
-  },
-  {
-    "id": "p20230003",
-    "name": "王五",
-    "handle": "ww",
-    "grade": 2023,
-    "status": "active",
-    "oj_accounts": [
-      { "platform": "codeforces", "handle": "wangwu_cf" },
-      { "platform": "atcoder", "handle": "wangwu_ac" }
-    ]
-  },
-  {
-    "id": "p20230101",
-    "name": "赵六",
-    "handle": "zl",
-    "grade": 2023,
-    "status": "active",
-    "oj_accounts": [
-      { "platform": "codeforces", "handle": "zhaoliu_cf" }
-    ]
-  },
-  {
-    "id": "p20220001",
-    "name": "陈七",
-    "handle": "cq",
-    "grade": 2022,
-    "status": "retired",
-    "oj_accounts": [
-      { "platform": "codeforces", "handle": "chenqi_cf" },
-      { "platform": "atcoder", "handle": "chenqi_ac" },
-      { "platform": "nowcoder", "handle": "chenqi_nc" }
-    ],
-    "aliases": ["陈七", "Chen Qi"]
-  },
-  {
-    "id": "p20220002",
-    "name": "周八",
-    "handle": "zb",
-    "grade": 2022,
+    "name": "李名骕",
+    "grade": 0,
     "status": "left",
-    "oj_accounts": [
-      { "platform": "luogu", "handle": "zhouba_lg" }
-    ]
+    "oj_accounts": [],
+    "id": "p002"
   },
   {
-    "id": "p20240001",
-    "name": "吴九",
-    "handle": "wj",
-    "grade": 2024,
+    "name": "李冉曦",
+    "grade": 0,
+    "status": "left",
+    "oj_accounts": [],
+    "id": "p003"
+  },
+  {
+    "name": "石珈豪",
+    "grade": 0,
     "status": "active",
-    "oj_accounts": []
+    "oj_accounts": [],
+    "id": "p004"
+  },
+  {
+    "name": "俞铭泽",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p005"
+  },
+  {
+    "name": "韦慧欣",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p006"
+  },
+  {
+    "name": "王杰",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p007"
+  },
+  {
+    "name": "李涛",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p008"
+  },
+  {
+    "name": "项若楚",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p009"
+  },
+  {
+    "name": "杨钦",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p010"
+  },
+  {
+    "name": "王海潮",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p011"
+  },
+  {
+    "name": "张佳乐",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p012"
+  },
+  {
+    "name": "樊胤鸿",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p013"
+  },
+  {
+    "name": "张伟模",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p014"
+  },
+  {
+    "name": "欧辉强",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p015"
+  },
+  {
+    "name": "姚瑞希",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p016"
+  },
+  {
+    "name": "董汶奇",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p017"
+  },
+  {
+    "name": "付秀杰",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p018"
+  },
+  {
+    "name": "李源沁",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p019"
+  },
+  {
+    "name": "孙泓莉",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p020"
+  },
+  {
+    "name": "普玥菲",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p021"
+  },
+  {
+    "name": "李先笙",
+    "grade": 0,
+    "status": "left",
+    "oj_accounts": [],
+    "id": "p022"
+  },
+  {
+    "name": "买鑫鑫",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p023"
+  },
+  {
+    "name": "钟佳汶",
+    "grade": 0,
+    "status": "active",
+    "oj_accounts": [],
+    "id": "p024"
   }
 ]

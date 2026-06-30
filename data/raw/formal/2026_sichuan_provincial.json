@@ -1,0 +1,209 @@
+{
+  "contest_id": "2026_sichuan_provincial",
+  "source_format": "xcpcio_xlsx",
+  "title": "第十八届四川省大学生程序设计竞赛",
+  "date": "2026-05-18",
+  "contest_type": "icpc_provincial",
+  "format": "team_xcpc",
+  "total_teams": 312,
+  "total_problems": 12,
+  "school_teams_count": 11,
+  "school_teams_awarded": 8,
+  "award_thresholds": {
+    "gold": [
+      5,
+      519
+    ],
+    "silver": [
+      3,
+      131
+    ],
+    "bronze": [
+      2,
+      211
+    ],
+    "source": "formal_medals"
+  },
+  "competition_year": 2025,
+  "season": "2026-春学期",
+  "contest_type_label": "ICPC 省赛",
+  "format_label": "组队 XCPC",
+  "rated": true,
+  "weight": 70,
+  "weight_source": "config",
+  "standings": [
+    {
+      "team_id": "t_23db55ea",
+      "team_name": "泠鸢yousa从小就不迷路",
+      "member_names": [
+        "刘家乐",
+        "李名骕",
+        "李冉曦"
+      ],
+      "player_ids": [
+        "p001",
+        "p002",
+        "p003"
+      ],
+      "size": 3,
+      "rank": 7,
+      "school_rank": 5,
+      "award": "gold",
+      "solved": 9,
+      "penalty": 1294,
+      "unofficial": true
+    },
+    {
+      "team_id": "t_0a9c850a",
+      "team_name": "漆黑的噬龙者",
+      "member_names": [
+        "石珈豪",
+        "俞铭泽",
+        "韦慧欣"
+      ],
+      "player_ids": [
+        "p004",
+        "p005",
+        "p006"
+      ],
+      "size": 3,
+      "rank": 18,
+      "school_rank": null,
+      "award": "gold",
+      "solved": 7,
+      "penalty": 956,
+      "unofficial": false
+    },
+    {
+      "team_id": "t_fdf3b902",
+      "team_name": "新王朝",
+      "member_names": [
+        "王杰",
+        "李涛",
+        "项若楚"
+      ],
+      "player_ids": [
+        "p007",
+        "p008",
+        "p009"
+      ],
+      "size": 3,
+      "rank": 39,
+      "school_rank": null,
+      "award": "silver",
+      "solved": 5,
+      "penalty": 529,
+      "unofficial": false
+    },
+    {
+      "team_id": "t_58e572f4",
+      "team_name": "411",
+      "member_names": [
+        "杨钦",
+        "王海潮",
+        "张佳乐"
+      ],
+      "player_ids": [
+        "p010",
+        "p011",
+        "p012"
+      ],
+      "size": 3,
+      "rank": 46,
+      "school_rank": null,
+      "award": "silver",
+      "solved": 5,
+      "penalty": 647,
+      "unofficial": false
+    },
+    {
+      "team_id": "t_e37a406a",
+      "team_name": "三个人的舞还是太难跳了",
+      "member_names": [
+        "李先笙",
+        "买鑫鑫",
+        "钟佳汶"
+      ],
+      "player_ids": [
+        "p022",
+        "p023",
+        "p024"
+      ],
+      "size": 3,
+      "rank": 85,
+      "school_rank": null,
+      "award": "silver",
+      "solved": 4,
+      "penalty": 523,
+      "unofficial": true,
+      "manually_added": true,
+      "note": "打星队，Organization=阿坝师范学院，未挂靠本校"
+    },
+    {
+      "team_id": "t_a81493ce",
+      "team_name": "阵前再亮旧时钳，膏黄蟹美似当年",
+      "member_names": [
+        "樊胤鸿",
+        "张伟模",
+        "欧辉强"
+      ],
+      "player_ids": [
+        "p013",
+        "p014",
+        "p015"
+      ],
+      "size": 3,
+      "rank": 182,
+      "school_rank": null,
+      "award": "bronze",
+      "solved": 2,
+      "penalty": 122,
+      "unofficial": true
+    },
+    {
+      "team_id": "t_af4bbd2b",
+      "team_name": "奶龙说的队",
+      "member_names": [
+        "姚瑞希",
+        "董汶奇",
+        "付秀杰"
+      ],
+      "player_ids": [
+        "p016",
+        "p017",
+        "p018"
+      ],
+      "size": 3,
+      "rank": 192,
+      "school_rank": null,
+      "award": "bronze",
+      "solved": 2,
+      "penalty": 153,
+      "unofficial": false
+    },
+    {
+      "team_id": "t_144c87fe",
+      "team_name": "微笑面队",
+      "member_names": [
+        "李源沁",
+        "孙泓莉",
+        "普玥菲"
+      ],
+      "player_ids": [
+        "p019",
+        "p020",
+        "p021"
+      ],
+      "size": 3,
+      "rank": 208,
+      "school_rank": null,
+      "award": "bronze",
+      "solved": 2,
+      "penalty": 211,
+      "unofficial": false
+    }
+  ],
+  "unmatched_players": [],
+  "unmatched_teams": [],
+  "school_teams_manual": 1
+}

@@ -58,7 +58,7 @@ class PlayerService:
     def create_player(self, data: PlayerCreate, *, today: date | None = None) -> Player:
         today = today or date.today()
         players = self.store.load_all()
-        player_id = data.id or self.store.next_id(data.grade, players)
+        player_id = data.id or self.store.next_id(players)
         if any(player.id == player_id for player in players):
             raise PlayerAlreadyExistsError(player_id)
 

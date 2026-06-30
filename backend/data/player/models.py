@@ -30,7 +30,7 @@ class OJAccount(BaseModel):
 class PlayerBase(BaseModel):
     name: str = Field(min_length=1)
     handle: str | None = None
-    grade: int = Field(ge=2000, le=2035)
+    grade: int = Field(ge=0, le=2035)
     status: PlayerStatus = PlayerStatus.active
     oj_accounts: list[OJAccount] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
@@ -63,7 +63,7 @@ class PlayerCreate(PlayerBase):
 class PlayerUpdate(BaseModel):
     name: str | None = None
     handle: str | None = None
-    grade: int | None = Field(default=None, ge=2000, le=2035)
+    grade: int | None = Field(default=None, ge=0, le=2035)
     status: PlayerStatus | None = None
     oj_accounts: list[OJAccount] | None = None
     aliases: list[str] | None = None
@@ -93,7 +93,7 @@ class Player(PlayerBase):
         today = today or date.today()
         return self.model_copy(
             update={
-                "grade_label": f"{self.grade}级",
+                "grade_label": "未设置" if self.grade == 0 else f"{self.grade}级",
                 "status_label": STATUS_LABELS[self.status.value],
                 "updated_at": today,
             }

@@ -13,7 +13,7 @@ def test_create_and_get(service):
         PlayerCreate(name="测试甲", handle="csj", grade=2025, status=PlayerStatus.active),
         today=date(2026, 6, 29),
     )
-    assert created.id == "p2025001"
+    assert created.id == "p001"
     assert created.grade_label == "2025级"
     assert created.status_label == "现役"
 
@@ -79,13 +79,10 @@ def test_find_by_name_and_oj(service):
     assert service.find_by_oj("codeforces", "missing") is None
 
 
-def test_persists_raw_and_processed(temp_store, service):
+def test_persists_raw(temp_store, service):
     service.create_player(PlayerCreate(name="持久化", grade=2023, handle="cch"), today=date(2026, 6, 29))
 
     raw = json.loads(temp_store.raw_path.read_text(encoding="utf-8"))
-    processed = json.loads(temp_store.processed_path.read_text(encoding="utf-8"))
 
     assert raw[0]["name"] == "持久化"
     assert "grade_label" not in raw[0]
-    assert processed[0]["grade_label"] == "2023级"
-    assert processed[0]["updated_at"] == "2026-06-29"

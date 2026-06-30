@@ -1,21 +1,31 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import date
 from pathlib import Path
 
-from player.models import Player
+from team.models import Team
 
 
 def find_repo_root(start: Path | None = None) -> Path:
     current = (start or Path(__file__)).resolve()
     for parent in [current, *current.parents]:
-        if (parent / "data" / "raw" / "players" / "roster.json").is_file():
+        if (parent / "data" / "config" / "school.yaml").is_file():
             return parent
-    raise FileNotFoundError("无法定位仓库根目录（缺少 data/raw/players/roster.json）")
+    raise FileNotFoundError("无法定位仓库根目录（缺少 data/config/school.yaml）")
 
 
-class PlayerStore:
+def make_member_key(members: list[str]) -> str:
+    return "|".join(sorted(members))
+
+
+def make_team_id(member_key: str) -> str:
+    digest = hashlib.sha256(member_key.encode()).hexdigest()[:8]
+    return f"t_{digest}"
+
+
+class TeamStore:
     def __init__(
         self,
         *,
@@ -23,40 +33,29 @@ class PlayerStore:
         raw_path: Path | None = None,
     ) -> None:
         root = repo_root or find_repo_root()
-        self.raw_path = raw_path or root / "data" / "raw" / "players" / "roster.json"
+        self.raw_path = raw_path or root / "data" / "raw" / "teams" / "roster.json"
 
-    def load_all(self) -> list[Player]:
+    def load_all(self) -> list[Team]:
         raw_items = self._read_json_array(self.raw_path)
-        players = [Player.model_validate(item) for item in raw_items]
-        return self._sort_players(players)
+        teams = [Team.model_validate(item) for item in raw_items]
+        return self._sort_teams(teams)
 
-    def save_all(self, players: list[Player], *, today: date | None = None) -> None:
+    def save_all(self, teams: list[Team], *, today: date | None = None) -> None:
         today = today or date.today()
-        ordered = self._sort_players(players)
+        ordered = self._sort_teams(teams)
         raw_items: list[dict] = []
 
-        for player in ordered:
-            item = player.model_copy()
+        for team in ordered:
+            item = team.model_copy()
             if item.created_at is None:
                 item.created_at = today
             raw_items.append(item.to_raw_dict())
 
         self._write_json_array(self.raw_path, raw_items)
 
-    def next_id(self, players: list[Player] | None = None) -> str:
-        players = players if players is not None else self.load_all()
-        prefix = "p"
-        max_seq = 0
-        for player in players:
-            if player.id.startswith(prefix) and len(player.id) > len(prefix):
-                suffix = player.id[len(prefix) :]
-                if suffix.isdigit():
-                    max_seq = max(max_seq, int(suffix))
-        return f"{prefix}{max_seq + 1:03d}"
-
     @staticmethod
-    def _sort_players(players: list[Player]) -> list[Player]:
-        return sorted(players, key=lambda item: item.id)
+    def _sort_teams(teams: list[Team]) -> list[Team]:
+        return sorted(teams, key=lambda item: item.id)
 
     @staticmethod
     def _read_json_array(path: Path) -> list[dict]:

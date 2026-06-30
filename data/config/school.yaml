@@ -1,0 +1,7 @@
+# 本校在 XCPC.io 导出 xlsx 中的 Organization 精确匹配名
+organizations:
+  - "西南民族大学"
+
+# 导入时自动建档选手的默认入学年（可被 FormalImportParams.default_grade 覆盖）
+player_defaults:
+  grade: 0
