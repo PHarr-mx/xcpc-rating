@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import date
 from pathlib import Path
@@ -20,11 +19,6 @@ def make_member_key(members: list[str]) -> str:
     return "|".join(sorted(members))
 
 
-def make_team_id(member_key: str) -> str:
-    digest = hashlib.sha256(member_key.encode()).hexdigest()[:8]
-    return f"t_{digest}"
-
-
 class TeamStore:
     def __init__(
         self,
@@ -34,6 +28,17 @@ class TeamStore:
     ) -> None:
         root = repo_root or find_repo_root()
         self.raw_path = raw_path or root / "data" / "raw" / "teams" / "roster.json"
+
+    def next_id(self, teams: list[Team] | None = None) -> str:
+        teams = teams if teams is not None else self.load_all()
+        prefix = "t"
+        max_seq = 0
+        for team in teams:
+            if team.id.startswith(prefix) and len(team.id) > len(prefix):
+                suffix = team.id[len(prefix):]
+                if suffix.isdigit():
+                    max_seq = max(max_seq, int(suffix))
+        return f"{prefix}{max_seq + 1:03d}"
 
     def load_all(self) -> list[Team]:
         raw_items = self._read_json_array(self.raw_path)

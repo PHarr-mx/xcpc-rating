@@ -8,22 +8,15 @@ from team.exceptions import (
     TeamValidationError,
 )
 from team.models import Team, TeamCreate, TeamUpdate
-from team.store import TeamStore, make_member_key, make_team_id
+from team.store import TeamStore, make_member_key
 
 
 class TeamService:
     def __init__(self, store: TeamStore | None = None) -> None:
         self.store = store or TeamStore()
 
-    def list_teams(
-        self,
-        *,
-        is_school_team: bool | None = None,
-    ) -> list[Team]:
-        teams = self.store.load_all()
-        if is_school_team is not None:
-            teams = [team for team in teams if team.is_school_team == is_school_team]
-        return teams
+    def list_teams(self) -> list[Team]:
+        return self.store.load_all()
 
     def get_team(self, team_id: str) -> Team:
         for team in self.store.load_all():
@@ -48,31 +41,44 @@ class TeamService:
         if existing is not None:
             raise TeamAlreadyExistsError(member_key)
 
-        team_id = make_team_id(member_key)
         teams = self.store.load_all()
+        team_id = data.id or self.store.next_id(teams)
 
         if any(team.id == team_id for team in teams):
             raise TeamValidationError(f"队伍 ID 冲突: {team_id}")
-
-        names = [data.display_name] if data.display_name else []
-        if data.names:
-            names = data.names
 
         team = Team(
             id=team_id,
             member_key=member_key,
             members=data.members,
             size=len(data.members),
-            names=names,
-            display_name=data.display_name or (names[0] if names else ""),
-            is_school_team=data.is_school_team,
-            first_seen=today,
-            last_seen=today,
+            aliases=data.aliases,
             created_at=today,
         )
         teams.append(team)
         self.store.save_all(teams, today=today)
         return team.with_derived_fields(today=today)
+
+    def add_alias(self, team_id: str, alias: str, *, today: date | None = None) -> Team:
+        """向已有队伍追加一个别名。"""
+        today = today or date.today()
+        alias = alias.strip()
+        if not alias:
+            raise TeamValidationError("别名不能为空")
+
+        teams = self.store.load_all()
+        index = self._index_of(teams, team_id)
+        current = teams[index]
+
+        if alias in current.aliases:
+            return current
+
+        updated = current.model_copy(
+            update={"aliases": current.aliases + [alias]}
+        )
+        teams[index] = updated
+        self.store.save_all(teams, today=today)
+        return updated.with_derived_fields(today=today)
 
     def update_team(
         self,
@@ -86,26 +92,17 @@ class TeamService:
         index = self._index_of(teams, team_id)
         current = teams[index]
 
-        updates: dict = {}
+        if data.alias is not None:
+            alias = data.alias.strip()
+            if alias and alias not in current.aliases:
+                updated = current.model_copy(
+                    update={"aliases": current.aliases + [alias]}
+                )
+                teams[index] = updated
+                self.store.save_all(teams, today=today)
+                return updated.with_derived_fields(today=today)
 
-        if data.name is not None:
-            name = data.name.strip()
-            if name and name not in current.names:
-                updates["names"] = current.names + [name]
-
-        if data.display_name is not None:
-            updates["display_name"] = data.display_name.strip()
-
-        if data.is_school_team is not None:
-            updates["is_school_team"] = data.is_school_team
-
-        if not updates:
-            return current.with_derived_fields(today=today)
-
-        updated = current.model_copy(update=updates)
-        teams[index] = updated
-        self.store.save_all(teams, today=today)
-        return updated.with_derived_fields(today=today)
+        return current.with_derived_fields(today=today)
 
     def delete_team(self, team_id: str, *, today: date | None = None) -> Team:
         today = today or date.today()

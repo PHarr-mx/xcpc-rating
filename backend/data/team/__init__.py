@@ -17,7 +17,7 @@ from team.exceptions import (
 )
 from team.models import Team, TeamCreate, TeamUpdate
 from team.service import TeamService
-from team.store import TeamStore, find_repo_root, make_member_key, make_team_id
+from team.store import TeamStore, find_repo_root, make_member_key
 
 __all__ = [
     "Team",
@@ -39,6 +39,5 @@ __all__ = [
     "get_team",
     "list_teams",
     "make_member_key",
-    "make_team_id",
     "update_team",
 ]

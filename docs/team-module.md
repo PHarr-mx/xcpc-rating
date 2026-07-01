@@ -9,7 +9,7 @@
 ## 1. 模块职责
 
 - 队伍的**增删改查**（编程 API + CLI 双入口）
-- 以**队员集合**识别队伍身份，队名可重复
+- 以**队员集合**识别队伍身份，队名不参与身份判定
 - 作为 Rating 计算、比赛成绩引用的**参赛单元**
 
 ---
@@ -36,11 +36,11 @@
 {张三, 李四, 赵六}   → 队伍 D（王五 换成 赵六，成员集合变了）
 ```
 
-### 2.2 队名（Team Name）
+### 2.2 队名（Aliases）
 
-- 仅存在于记录中的 `names[]`（累积所有队名）和 `display_name`（展示名）
+- 存储在 `aliases[]`（累积所有队名）
 - **不唯一**、不强制与 `team_id` 一一对应
-- 展示时取 `display_name`（默认最近使用的队名）
+- 队员相同但队名不同 → 追加到 `aliases`，不新建队伍
 
 ### 2.3 长期实体
 
@@ -57,15 +57,11 @@
 # backend/data/team/models.py
 
 class Team(TeamBase):
-    id: str                          # t_XXXXXXXX（8 位 hex）
+    id: str                          # t001, t002, ...（sequential）
     member_key: str                  # "p001|p002|p003"（排序后拼接）
     members: list[str]               # 1-3 个 player_id
     size: int                        # 1-3，派生自 len(members)
-    names: list[str]                 # 历次使用过的队名并集
-    display_name: str                # 默认展示名
-    is_school_team: bool = True      # 是否本校队伍
-    first_seen: date | None          # 首次参赛日期
-    last_seen: date | None           # 最近参赛日期
+    aliases: list[str]               # 历次使用过的队名列表
     created_at: date | None = None
     updated_at: date | None = None
 ```
@@ -85,26 +81,25 @@ def make_member_key(members: list[str]) -> str:
 ### 3.3 team_id 生成
 
 ```python
-def make_team_id(member_key: str) -> str:
-    digest = hashlib.sha256(member_key.encode()).hexdigest()[:8]
-    return f"t_{digest}"
-    # "p001|p002|p003" → "t_23db55ea"
+# backend/data/team/store.py — TeamStore.next_id()
+
+def next_id(self, teams: list[Team] | None = None) -> str:
+    # 扫描现有 ID，取最大序号 +1
+    # t001, t002, t003, ...
 ```
 
-基于队员集合的 SHA-256 哈希，确定性强：同一组人永远生成相同的 `team_id`。
+基于全局递增序号，与 `player_id` 格式一致（`p001` / `t001`）。
 
 ### 3.4 TeamCreate / TeamUpdate
 
 ```python
 class TeamCreate(TeamBase):
-    members: list[str]           # 1-3 个 player_id
-    display_name: str            # 初始队名
-    is_school_team: bool = True
+    id: str | None = None            # 省略时自动生成
+    members: list[str]               # 1-3 个 player_id
+    aliases: list[str] = []          # 初始队名列表
 
 class TeamUpdate(BaseModel):
-    name: str | None = None          # 追加到 names 列表
-    display_name: str | None = None  # 更新展示名
-    is_school_team: bool | None = None
+    alias: str | None = None         # 追加到 aliases 列表
 ```
 
 **注意**：`TeamUpdate` 不允许修改 `members`。换员 = 新队，应创建新队伍。
@@ -116,7 +111,7 @@ class TeamUpdate(BaseModel):
 ```
 team/api.py          ← 公开编程接口（所有外部调用入口）
 team/cli.py          ← xcpc-team 命令行
-team/service.py      ← 业务逻辑（CRUD、查询、唯一性校验）
+team/service.py      ← 业务逻辑（CRUD、查询、add_alias、唯一性校验）
 team/store.py        ← JSON 文件读写（data/raw/teams/roster.json）
 team/models.py       ← Pydantic 数据模型
 team/exceptions.py   ← 异常层次结构
@@ -144,16 +139,13 @@ from team import (
     configure_store, get_service,
 )
 from team.models import TeamCreate, TeamUpdate
-from team.store import make_member_key, make_team_id
+from team.service import TeamService
 ```
 
 ### 5.1 查询
 
-**`list_teams(*, is_school_team=None) -> list[Team]`**
-
-| 参数 | 说明 |
-|------|------|
-| `is_school_team` | `True` 仅校内，`False` 仅校外，`None` 全部 |
+**`list_teams() -> list[Team]`**
+- 列出全部队伍
 
 **`get_team(team_id: str) -> Team`**
 - 按 ID 查询，不存在时抛出 `TeamNotFoundError`
@@ -166,15 +158,17 @@ from team.store import make_member_key, make_team_id
 
 **`create_team(data: TeamCreate, *, today=None) -> Team`**
 - `member_key` 由 `members` 自动计算（排序后拼接）
-- `team_id` 由 `member_key` 的 SHA-256 哈希自动生成
+- `team_id` 省略时自动生成（`t001`、`t002`…）
 - 校验：同一 `member_key` 不得重复
 - 持久化到 `data/raw/teams/roster.json`
 
 **`update_team(team_id: str, data: TeamUpdate, *, today=None) -> Team`**
-- `name`：追加到 `names` 列表（去重）
-- `display_name`：更新展示名
-- `is_school_team`：标记校内/校外
+- `alias`：追加到 `aliases` 列表（去重）
 - 不允许修改 `members`（换员应创建新队）
+
+**`add_alias(team_id: str, alias: str, *, today=None) -> Team`**
+- `TeamService` 方法，追加别名（去重）
+- 供 `resolve_team()` 在导入时自动调用
 
 **`delete_team(team_id: str) -> Team`**
 - 从名册**物理删除**队伍
@@ -184,28 +178,28 @@ from team.store import make_member_key, make_team_id
 ```python
 from team import create_team, find_by_members, list_teams, update_team
 from team.models import TeamCreate, TeamUpdate
+from team.service import TeamService
 
 # 新建队伍
 team = create_team(TeamCreate(
     members=["p001", "p002", "p003"],
-    display_name="三大队",
+    aliases=["三大队"],
 ))
-print(team.id)          # t_23db55ea
+print(team.id)          # t001
 print(team.member_key)  # p001|p002|p003
 
 # 按队员查找（顺序无关）
 found = find_by_members(["p003", "p001", "p002"])
-print(found.display_name)  # 三大队
+print(found.aliases)  # ["三大队"]
 
-# 追加队名
-team = update_team(team.id, TeamUpdate(name="无敌队"))
-print(team.names)  # ["三大队", "无敌队"]
+# 追加别名
+team = update_team(team.id, TeamUpdate(alias="无敌队"))
+print(team.aliases)  # ["三大队", "无敌队"]
 
-# 更新展示名
-team = update_team(team.id, TeamUpdate(display_name="无敌队"))
-
-# 列出校内队伍
-school_teams = list_teams(is_school_team=True)
+# 或使用 service 直接追加
+service = TeamService()
+team = service.add_alias(team.id, "超级队")
+print(team.aliases)  # ["三大队", "无敌队", "超级队"]
 ```
 
 ### 5.4 测试中使用独立存储
@@ -216,7 +210,7 @@ from team.models import TeamCreate
 
 store = TeamStore(raw_path="/tmp/test/teams.json")
 configure_store(store)
-create_team(TeamCreate(members=["p001"], display_name="单测"))
+create_team(TeamCreate(members=["p001"], aliases=["单测"]))
 ```
 
 ---
@@ -226,11 +220,11 @@ create_team(TeamCreate(members=["p001"], display_name="单测"))
 CLI 与编程 API 一一对应：
 
 ```bash
-xcpc-team list [--school-only] [--json]
+xcpc-team list [--json]
 xcpc-team get <team_id> [--json]
 xcpc-team find --members <p001> [<p002> ...] [--json]
-xcpc-team create --members <p001> [<p002> ...] --name <name> [--no-school] [--json]
-xcpc-team update <team_id> [--name <name>] [--display-name <name>] [--school true|false] [--json]
+xcpc-team create --members <p001> [<p002> ...] --aliases <alias> [...] [--json]
+xcpc-team update <team_id> --alias <alias> [--json]
 xcpc-team delete <team_id> [--json]
 ```
 
@@ -239,23 +233,20 @@ xcpc-team delete <team_id> [--json]
 ```bash
 cd backend
 
-# 列出校内队伍
-python -m team.cli list --school-only
+# 列出所有队伍
+python -m team.cli list
 
 # 按队员查找
 python -m team.cli find --members p001 p002 p003
 
 # 新建队伍
-python -m team.cli create --members p001 p002 p003 --name "测试队"
+python -m team.cli create --members p001 p002 p003 --aliases "测试队"
 
-# 追加队名
-python -m team.cli update t_23db55ea --name "新队名"
-
-# 更新展示名
-python -m team.cli update t_23db55ea --display-name "新展示名"
+# 追加别名
+python -m team.cli update t001 --alias "新队名"
 
 # JSON 输出
-python -m team.cli --json get t_23db55ea
+python -m team.cli --json get t001
 ```
 
 ---
@@ -285,15 +276,11 @@ python -m team.cli --json get t_23db55ea
 ```json
 [
   {
-    "id": "t_23db55ea",
+    "id": "t001",
     "member_key": "p001|p002|p003",
     "members": ["p001", "p002", "p003"],
     "size": 3,
-    "names": ["三大队", "无敌队"],
-    "display_name": "无敌队",
-    "is_school_team": true,
-    "first_seen": "2026-06-30",
-    "last_seen": "2026-06-30"
+    "aliases": ["三大队", "无敌队"]
   }
 ]
 ```
@@ -302,20 +289,32 @@ python -m team.cli --json get t_23db55ea
 
 ## 9. 与 Formal Import 的协作
 
-正式赛导入（`backend/data/import/formal.py`）中已使用相同的 `team_id` 生成逻辑：
+正式赛导入（`backend/data/import/formal.py`）中已集成队伍管理：
 
 ```python
 # backend/data/import/formal.py
-def _team_id(player_ids: list[str]) -> str:
-    member_key = "|".join(sorted(player_ids))
-    digest = hashlib.sha256(member_key.encode()).hexdigest()[:8]
-    return f"t_{digest}"
+
+def resolve_team(player_ids, team_name, store):
+    member_key = make_member_key(player_ids)
+    service = TeamService(store)
+    team = service.find_by_member_key(member_key)
+    if team:
+        # 队员相同、队名不同 → 追加别名
+        if team_name and team_name.strip() not in team.aliases:
+            service.add_alias(team.id, team_name.strip())
+        return team.id
+    # 新队伍 → 自动建档
+    created = service.create_team(TeamCreate(
+        members=player_ids,
+        aliases=[team_name.strip()] if team_name and team_name.strip() else [],
+    ))
+    return created.id
 ```
 
-后续可将 import 流程与 team 模块集成：
-- 导入比赛时，调用 `find_by_members()` 查找已有队伍
+导入比赛时自动：
+- 调用 `find_by_member_key()` 查找已有队伍
 - 新队伍调用 `create_team()` 写入名册
-- 已有队伍调用 `update_team()` 追加队名、更新 `last_seen`
+- 已有队伍队名不同时追加 alias
 
 ---
 

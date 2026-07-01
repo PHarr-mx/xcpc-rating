@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import date
 from pathlib import Path
@@ -30,13 +29,10 @@ from importer.players import resolve_default_grade, resolve_member_names
 from importer.weights import load_formal_weight
 from importer.xcpcio_xlsx import parse_xcpcio_xlsx
 from player.store import PlayerStore, find_repo_root
+from team.models import TeamCreate
+from team.service import TeamService
+from team.store import TeamStore, make_member_key
 from utils.plog import Plog
-
-
-def _team_id(player_ids: list[str]) -> str:
-    member_key = "|".join(sorted(player_ids))
-    digest = hashlib.sha256(member_key.encode()).hexdigest()[:8]
-    return f"t_{digest}"
 
 
 def _player_store(repo_root: Path) -> PlayerStore:
@@ -46,15 +42,46 @@ def _player_store(repo_root: Path) -> PlayerStore:
     )
 
 
+def _team_store(repo_root: Path) -> TeamStore:
+    return TeamStore(
+        raw_path=repo_root / "data" / "raw" / "teams" / "roster.json",
+        repo_root=repo_root,
+    )
+
+
+def resolve_team(
+    player_ids: list[str],
+    team_name: str,
+    store: TeamStore,
+) -> str:
+    """查找或创建队伍，返回 team_id。
+
+    队员相同但队名不同时，视为同一队伍，将新队名追加到 aliases。
+    """
+    member_key = make_member_key(player_ids)
+    service = TeamService(store)
+    team = service.find_by_member_key(member_key)
+    if team:
+        if team_name and team_name.strip() not in team.aliases:
+            service.add_alias(team.id, team_name.strip())
+        return team.id
+    created = service.create_team(TeamCreate(
+        members=player_ids,
+        aliases=[team_name.strip()] if team_name and team_name.strip() else [],
+    ))
+    return created.id
+
+
 def _build_standing_entry(
     *,
     row,
     player_ids: list[str],
+    team_id: str,
     manually_added: bool = False,
     note: str | None = None,
 ) -> dict[str, Any]:
     entry = {
-        "team_id": _team_id(player_ids),
+        "team_id": team_id,
         "team_name": row.team_name,
         "member_names": row.members,
         "player_ids": player_ids,
@@ -77,10 +104,11 @@ def _build_standing_entry_from_params(
     params: AddFormalTeamParams,
     *,
     player_ids: list[str],
+    team_id: str,
     award: str,
 ) -> dict[str, Any]:
     entry = {
-        "team_id": _team_id(player_ids),
+        "team_id": team_id,
         "team_name": params.team_name,
         "member_names": params.member_names,
         "player_ids": player_ids,
@@ -179,6 +207,7 @@ def import_formal_xcpcio_xlsx(
     root = repo_root or find_repo_root()
     path = Path(path)
     player_store = _player_store(root)
+    team_store = _team_store(root)
     default_grade = resolve_default_grade(params, repo_root=root)
     today = params.date
 
@@ -254,7 +283,13 @@ def import_formal_xcpcio_xlsx(
                 plog.warning("队伍未导入", team_name=row.team_name, members=row.members, reason=reason)
             continue
 
-        standings_entries.append(_build_standing_entry(row=row, player_ids=player_ids))
+        standings_entries.append(
+            _build_standing_entry(
+                row=row,
+                player_ids=player_ids,
+                team_id=resolve_team(player_ids, row.team_name, team_store),
+            )
+        )
 
     raw_rel = raw_contest_rel_path(params.contest_id)
     raw_path = raw_contest_path(root, params.contest_id)
@@ -320,6 +355,7 @@ def add_formal_team(
     )
 
     player_store = _player_store(root)
+    team_store = _team_store(root)
     default_grade = load_default_player_grade(repo_root=root, override=params.default_grade)
     today = _contest_date(document)
 
@@ -340,7 +376,12 @@ def add_formal_team(
             f"未匹配: {[item.name for item in unmatched_players]}"
         )
 
-    entry = _build_standing_entry_from_params(params, player_ids=player_ids, award=award)
+    entry = _build_standing_entry_from_params(
+        params,
+        player_ids=player_ids,
+        team_id=resolve_team(player_ids, params.team_name, team_store),
+        award=award,
+    )
     standings = list(document.get("standings") or [])
     replaced = _upsert_standing(standings, entry)
     document["standings"] = standings

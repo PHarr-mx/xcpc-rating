@@ -29,11 +29,10 @@ def get_service(*, store: TeamStore | None = None) -> TeamService:
 
 def list_teams(
     *,
-    is_school_team: bool | None = None,
     store: TeamStore | None = None,
 ) -> list[Team]:
-    """列出队伍，支持按校内/校外筛选。"""
-    return get_service(store=store).list_teams(is_school_team=is_school_team)
+    """列出所有队伍。"""
+    return get_service(store=store).list_teams()
 
 
 def get_team(team_id: str, *, store: TeamStore | None = None) -> Team:

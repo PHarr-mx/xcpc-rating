@@ -68,7 +68,6 @@ _activate_and_export() {
   echo ">>> 已激活环境: ${ENV_NAME}"
   echo ">>> Python: $(python --version)"
   echo ">>> PYTHONPATH=${PYTHONPATH}"
-  echo ">>> 可运行: pytest"
   echo ">>> 可运行: xcpc-player list --visible-only"
 }
 

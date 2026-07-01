@@ -23,13 +23,13 @@ def _print_teams(teams: list, *, as_json: bool) -> None:
         return
     for team in teams:
         members_str = ", ".join(team.members)
-        school_tag = "校内" if team.is_school_team else "校外"
-        print(f"{team.id}\t{team.display_name}\t[{members_str}]\t{team.size}人\t{school_tag}")
+        aliases_str = " | ".join(team.aliases) if team.aliases else "(无别名)"
+        print(f"{team.id}\t{aliases_str}\t[{members_str}]\t{team.size}人")
 
 
 def cmd_list(args: Namespace, plog: Plog) -> int:
-    plog.info("列出队伍", is_school_team=args.school_only if args.school_only else None)
-    teams = api.list_teams(is_school_team=True if args.school_only else None)
+    plog.info("列出队伍")
+    teams = api.list_teams()
     plog.info("查询完成", count=len(teams))
     _print_teams(teams, as_json=args.json)
     return 0
@@ -46,7 +46,7 @@ def cmd_find(args: Namespace, plog: Plog) -> int:
     plog.info("按队员查找", members=args.members)
     team = api.find_by_members(args.members)
     if team:
-        plog.info("查找完成", team_id=team.id, display_name=team.display_name)
+        plog.info("查找完成", team_id=team.id, aliases=team.aliases)
         _print_teams([team], as_json=args.json)
     else:
         plog.info("未找到匹配队伍")
@@ -55,48 +55,43 @@ def cmd_find(args: Namespace, plog: Plog) -> int:
 
 
 def cmd_create(args: Namespace, plog: Plog) -> int:
-    plog.info("新建队伍", members=args.members, name=args.name)
+    plog.info("新建队伍", members=args.members, aliases=args.aliases)
     team = api.create_team(
         TeamCreate(
             members=args.members,
-            display_name=args.name,
-            is_school_team=not args.no_school,
+            aliases=args.aliases,
         )
     )
-    plog.info("队伍已创建", team_id=team.id, display_name=team.display_name)
+    plog.info("队伍已创建", team_id=team.id, aliases=team.aliases)
     if args.json:
         print(json.dumps(team.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
-        print(f"已创建: {team.id} {team.display_name}")
+        aliases_str = " | ".join(team.aliases)
+        print(f"已创建: {team.id} {aliases_str}")
     return 0
 
 
 def cmd_update(args: Namespace, plog: Plog) -> int:
     plog.info("更新队伍", team_id=args.team_id)
-    payload: dict = {}
-    if args.name is not None:
-        payload["name"] = args.name
-    if args.display_name is not None:
-        payload["display_name"] = args.display_name
-    if args.school is not None:
-        payload["is_school_team"] = args.school
-    team = api.update_team(args.team_id, TeamUpdate(**payload))
-    plog.info("队伍已更新", team_id=team.id, display_name=team.display_name)
+    team = api.update_team(args.team_id, TeamUpdate(alias=args.alias))
+    plog.info("队伍已更新", team_id=team.id, aliases=team.aliases)
     if args.json:
         print(json.dumps(team.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
-        print(f"已更新: {team.id} {team.display_name}")
+        aliases_str = " | ".join(team.aliases)
+        print(f"已更新: {team.id} {aliases_str}")
     return 0
 
 
 def cmd_delete(args: Namespace, plog: Plog) -> int:
     plog.info("删除队伍", team_id=args.team_id)
     team = api.delete_team(args.team_id)
-    plog.info("队伍已删除", team_id=team.id, display_name=team.display_name)
+    plog.info("队伍已删除", team_id=team.id, aliases=team.aliases)
     if args.json:
         print(json.dumps(team.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
-        print(f"已删除: {team.id} {team.display_name}")
+        aliases_str = " | ".join(team.aliases)
+        print(f"已删除: {team.id} {aliases_str}")
     return 0
 
 
@@ -107,7 +102,6 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_parser = subparsers.add_parser("list", help="列出队伍")
-    list_parser.add_argument("--school-only", action="store_true", help="仅显示校内队伍")
 
     get_parser = subparsers.add_parser("get", help="查询单个队伍")
     get_parser.add_argument("team_id")
@@ -117,14 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     create_parser = subparsers.add_parser("create", help="新建队伍")
     create_parser.add_argument("--members", nargs="+", required=True, metavar="PLAYER_ID")
-    create_parser.add_argument("--name", required=True)
-    create_parser.add_argument("--no-school", action="store_true", help="标记为校外队伍")
+    create_parser.add_argument("--aliases", nargs="+", metavar="ALIAS", help="队伍别名")
 
     update_parser = subparsers.add_parser("update", help="更新队伍")
     update_parser.add_argument("team_id")
-    update_parser.add_argument("--name", help="追加队名")
-    update_parser.add_argument("--display-name", help="设置展示名")
-    update_parser.add_argument("--school", type=lambda s: s.lower() == "true", help="设置校内/校外 (true/false)")
+    update_parser.add_argument("--alias", required=True, help="追加别名")
 
     delete_parser = subparsers.add_parser("delete", help="从名册删除队伍")
     delete_parser.add_argument("team_id")

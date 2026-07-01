@@ -1,7 +1,7 @@
 {
   "contest_id": "2026_sichuan_provincial",
   "source_format": "xcpcio_xlsx",
-  "title": "第十八届四川省大学生程序设计竞赛",
+  "title": "第十八届四川省大学生程序设计竞赛 - 正式赛",
   "date": "2026-05-18",
   "contest_type": "icpc_provincial",
   "format": "team_xcpc",
@@ -33,7 +33,7 @@
   "weight_source": "config",
   "standings": [
     {
-      "team_id": "t_23db55ea",
+      "team_id": "t001",
       "team_name": "泠鸢yousa从小就不迷路",
       "member_names": [
         "刘家乐",
@@ -54,7 +54,7 @@
       "unofficial": true
     },
     {
-      "team_id": "t_0a9c850a",
+      "team_id": "t002",
       "team_name": "漆黑的噬龙者",
       "member_names": [
         "石珈豪",
@@ -75,7 +75,7 @@
       "unofficial": false
     },
     {
-      "team_id": "t_fdf3b902",
+      "team_id": "t003",
       "team_name": "新王朝",
       "member_names": [
         "王杰",
@@ -96,7 +96,7 @@
       "unofficial": false
     },
     {
-      "team_id": "t_58e572f4",
+      "team_id": "t004",
       "team_name": "411",
       "member_names": [
         "杨钦",
@@ -117,7 +117,7 @@
       "unofficial": false
     },
     {
-      "team_id": "t_e37a406a",
+      "team_id": "t008",
       "team_name": "三个人的舞还是太难跳了",
       "member_names": [
         "李先笙",
@@ -140,7 +140,7 @@
       "note": "打星队，Organization=阿坝师范学院，未挂靠本校"
     },
     {
-      "team_id": "t_a81493ce",
+      "team_id": "t005",
       "team_name": "阵前再亮旧时钳，膏黄蟹美似当年",
       "member_names": [
         "樊胤鸿",
@@ -161,7 +161,7 @@
       "unofficial": true
     },
     {
-      "team_id": "t_af4bbd2b",
+      "team_id": "t006",
       "team_name": "奶龙说的队",
       "member_names": [
         "姚瑞希",
@@ -182,7 +182,7 @@
       "unofficial": false
     },
     {
-      "team_id": "t_144c87fe",
+      "team_id": "t007",
       "team_name": "微笑面队",
       "member_names": [
         "李源沁",
