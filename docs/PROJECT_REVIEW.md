@@ -82,7 +82,7 @@ xcpc-rating/
 
 ### 3.3 代码组织与设计文档的偏差
 
-设计文档（`docs/design/04-数据流水线模块.md`）规划的包结构：
+设计文档（`docs/design/04-数据导入与加工模块.md`、`docs/design/05-数据导出与发布模块.md`）规划的包结构：
 
 ```
 backend/data/src/xcpc_data/
