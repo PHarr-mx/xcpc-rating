@@ -3,9 +3,14 @@
 > **Python** 负责数据采集与处理，**Vue 3 静态站**展示结果，**Caddy** 托管线上文件。  
 > 技术栈：Vue 3 + Vite + Vue Router + TypeScript；数据以 **JSON** 为主（构建期可按需引入 SQLite）。
 
+> ⚠️ **存在一份待评审的替代方案**：[design/09-Reflex-Web改造提案.md](design/09-Reflex-Web改造提案.md)
+> 提出用 Reflex 改造为可交互 Web 应用，会**替换本文的运行时模型**
+> （§5 frontend、§7 运行时、§8 选型、§9 构建发布、§10 Caddy 均受影响）。
+> 该提案**尚未采纳**，本文描述的仍是仓库既定设计。
+
 **业务详细设计**（选手、队伍、比赛、Rating、前端）见 **[docs/design/](design/README.md)**，依据 [需求文档.txt](需求文档.txt) 展开。
 
-**已实现的后端 API 文档**：[backend-player-module.md](backend-player-module.md)（选手增删改查，CLI 与编程接口）。
+**已实现的后端 API 文档**：[player-module.md](player-module.md)（选手增删改查，CLI 与编程接口）。
 
 ---
 

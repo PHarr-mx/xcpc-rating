@@ -27,6 +27,14 @@ XCPC 评级数据静态展示站。
 | [docs/PROJECT_REVIEW.md](docs/PROJECT_REVIEW.md) | 项目整体 Review（2026-06-30） |
 | [docs/需求文档.txt](docs/需求文档.txt) | 原始需求 |
 
+## 待评审提案
+
+| 文档 | 说明 |
+|------|------|
+| [docs/design/09-Reflex-Web改造提案.md](docs/design/09-Reflex-Web改造提案.md) | **待评审**：用 Reflex 改造为可交互 Web 应用（含 10/11/12 三份配套设计） |
+
+该提案会替换当前「静态站 + 无运行时后端」的架构，**尚未采纳**。评审从 09 读起。
+
 ## 环境
 
 ```bash

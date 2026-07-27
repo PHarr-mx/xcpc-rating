@@ -3,6 +3,10 @@
 > **代码路径**：`backend/`  
 > **架构说明**：见 [DESIGN.md](DESIGN.md)
 
+> ⚠️ [design/09-Reflex-Web改造提案](design/09-Reflex-Web改造提案.md)（待评审）会重排本文的包结构：
+> `backend/data/{player,team,import}` 迁为 `xcpc_core/*`，用 `pyproject.toml` 替代 PYTHONPATH，
+> 并新增 `xcpc_web/`。`backend/site/`（§3，未实现）在该方案下不再需要。
+
 ---
 
 ## 1. 目录结构
