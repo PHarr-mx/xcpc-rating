@@ -2,7 +2,7 @@
 
 > **状态：提案 · 待评审 · 未实施**
 > 隶属于 [09-Reflex-Web改造提案](./09-Reflex-Web改造提案.md)
-> 关联：[03-比赛与记录](./03-比赛与记录模块.md) · [04-数据导入与加工](./04-数据导入与加工模块.md) · [data-format.md](../data-format.md)
+> 关联：[03-比赛与记录](./03-比赛与记录模块.md) · [04-数据导入与加工](./04-数据导入与加工模块.md)
 
 本文定义域数据从 JSON 全量读写迁移到 SQLite 的表结构、重构范围与迁移步骤。
 
@@ -240,7 +240,7 @@ python -m xcpc_core.db.migrate_from_json        # 一次性灌数据
 - **幂等**：按主键 upsert，可反复重跑
 - 现有 ID（`p001`、`t001`、`t_<hash>`）原样保留，不重新编号
 - `created_at` 缺失时填迁移当日
-- 输出统计与未匹配项，走 [utils/plog](../backend.md) 记录
+- 输出统计与未匹配项，走结构化日志记录
 
 > `reflex db makemigrations` 检测不到未被应用引用的模型。
 > `xcpc_core/db/tables.py` 必须被 `xcpc_web` 实际 import，否则表不会进迁移脚本。
@@ -248,8 +248,6 @@ python -m xcpc_core.db.migrate_from_json        # 一次性灌数据
 ---
 
 ## 6. 已知数据问题（迁移前需处理）
-
-来自 [PROJECT_REVIEW](../PROJECT_REVIEW.md) §5.2：
 
 | 问题 | 影响 | 建议 |
 |------|------|------|
@@ -332,7 +330,7 @@ Reflex 的 State 默认存在**进程内存的字典**里（按 client token 索
 
 ### 7.5 备份
 
-替代原 [DESIGN.md](../DESIGN.md) §10.1 的数据 cron：
+替代原 DESIGN.md 的数据 cron：
 
 ```cron
 30 4 * * * sqlite3 /opt/xcpc-rating/data/db/xcpc.db ".backup '/var/backups/xcpc-$(date +\%F).db'"

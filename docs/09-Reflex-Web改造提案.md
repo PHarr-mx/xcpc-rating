@@ -2,10 +2,10 @@
 
 > **状态：提案 · 待评审 · 未实施**
 > 提出日期：2026-07-27
-> 关联：[DESIGN.md](../DESIGN.md) · [数据存储与迁移](./10-数据存储与迁移-SQLite.md) · [认证与权限](./11-认证与权限模块.md) · [Web 交互与页面](./12-Web交互与页面-Reflex.md)
+> 关联：[DESIGN.md](DESIGN.md) · [数据存储与迁移](./10-数据存储与迁移-SQLite.md) · [认证与权限](./11-认证与权限模块.md) · [Web 交互与页面](./12-Web交互与页面-Reflex.md)
 
 本文提出用 **Reflex** 把项目从「静态展示站」改造为「可交互 Web 应用」。
-**当前架构（Vue 3 静态站 + Caddy file_server）仍是仓库的既定设计**，见 [DESIGN.md](../DESIGN.md)。
+**当前架构（Vue 3 静态站 + Caddy file_server）仍是仓库的既定设计**，见 [DESIGN.md](DESIGN.md)。
 本提案被采纳后，才按 §10 的清单改写既有文档。
 
 ---
@@ -87,8 +87,7 @@ Reflex 编译出 React 前端，但**所有状态在服务端**，浏览器通�
 
 ## 4. 顶层目录结构
 
-用一个 `pyproject.toml` 统一打包，顺带解决 [PROJECT_REVIEW](../PROJECT_REVIEW.md) §3.3 记录的
-「`importer`/`player` 平铺靠 PYTHONPATH」偏差。
+用一个 `pyproject.toml` 统一打包，解决包结构扁平化问题。
 
 ```
 xcpc-rating/
@@ -207,7 +206,7 @@ Environment=API_URL=https://rating.example.com
 WantedBy=multi-user.target
 ```
 
-原 [DESIGN.md](../DESIGN.md) §10.1 的数据 cron（`xcpc-data export`）**删除** —— 数据是运行时算的。
+原 DESGIN.md 的数据 cron（`xcpc-data export`）**删除** —— 数据是运行时算的。
 改为一条 SQLite 备份 cron，见 [10](./10-数据存储与迁移-SQLite.md) §7。
 
 ---
@@ -244,8 +243,7 @@ WantedBy=multi-user.target
 
 ## 9. 反面论证：什么情况下不该做
 
-改造后**不再是**「线上无 Python、无 Node、无数据库」。原设计 [DESIGN.md](../DESIGN.md) §7 的
-这个特性是实打实的运维优势，换掉它得到的是交互能力。
+改造后**不再是**「线上无 Python、无 Node、无数据库」。
 
 若评审后发现：
 
@@ -254,8 +252,7 @@ WantedBy=multi-user.target
 - 不希望服务器上多一个常驻进程和数据库备份负担；
 
 那么**保持现有 Vue 3 静态站方案更合适**，本提案应被否决。
-在这种情况下更划算的投入是把 [PROJECT_REVIEW](../PROJECT_REVIEW.md) §7.2 的 P0 项
-（process / rating / export 流水线）做完。
+在这种情况下更划算的投入是把 process / rating / export 流水线做完。
 
 ---
 
@@ -265,14 +262,13 @@ WantedBy=multi-user.target
 
 | 文档 | 处理 |
 |------|------|
-| [DESIGN.md](../DESIGN.md) | §1 目录、§2 数据分层、§5 frontend、§7 运行时、§8 选型、§9 构建发布、§10 Caddy、§11 工作流 大改；§13 MVP 清单重写 |
+| [DESIGN.md](DESIGN.md) | 已更新为 Reflex 架构总览 |
 | [08-前端展示模块](./08-前端展示模块.md) | 整篇由 [12](./12-Web交互与页面-Reflex.md) 取代，Vue 版本留 Git 历史 |
 | [05-数据导出与发布模块](./05-数据导出与发布模块.md) | `public/` 从「前端数据源」降级为「可选只读导出」；原子导出逻辑保留给备份 |
 | [04-数据导入与加工模块](./04-数据导入与加工模块.md) | 增「Web 交互式导入」一节（`ImportBatch` 暂存 + 人工复核） |
 | [03-比赛与记录模块](./03-比赛与记录模块.md) | 增 SQLite 表结构映射；说明 formal/training 合表 |
 | [06](./06-Rating计算模块.md) · [07](./07-榜单模块.md) | 基本不动，算法与榜单定义仍成立 |
-| [data-format.md](../data-format.md) | raw 保留说明 + DB schema 位置 |
-| [backend.md](../backend.md) · [README.md](../../README.md) | 包结构、命令、环境 |
+| [README.md](../README.md) | 包结构、命令、环境 |
 | `skill/*/SKILL.md` | 三份 SKILL 内的 CLI 路径随包结构改动 |
 
 ---
