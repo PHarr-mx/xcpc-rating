@@ -1,11 +1,9 @@
-# Web 交互与页面（Reflex）
+# 前端与 Web 交互模块（Reflex）
 
-> **状态：提案 · 待评审 · 未实施**
-> 隶属于 [09-Reflex-Web改造提案](./09-Reflex-Web改造提案.md)
-> 关联：[08-前端展示模块](./08-前端展示模块.md)（Vue 版，本文取代之） · [11-认证与权限](./11-认证与权限模块.md) · [07-榜单模块](./07-榜单模块.md)
+> 关联：[DESIGN.md](DESIGN.md) · [榜单](./07-榜单模块.md) · [认证与权限](./09-认证与权限模块.md) · [数据存储与SQLite](./10-数据存储与SQLite.md)
 
-本文定义 Reflex 应用的 State 划分、路由、页面与组件。
-采纳后取代 [08-前端展示模块](./08-前端展示模块.md)。
+> 本文定义 Reflex 应用的 State 划分、路由、页面与组件。
+> 原 Vue 3 静态站方案已废弃，由本文取代（Vue 版本留 Git 历史）。
 
 ---
 
@@ -13,10 +11,10 @@
 
 | 项 | 选型 | 说明 |
 |----|------|------|
-| 框架 | Reflex 0.9.x | 锁死具体版本，见 [09](./09-Reflex-Web改造提案.md) §8 |
+| 框架 | Reflex 0.9.x | 锁死具体版本，升级作独立任务，见 [11](./11-部署与运维.md) §6 |
 | 组件 | `reflex-components-core` + `-lucide`（图标） | 随 Reflex 分包发布，各自独立版本 |
 | 图表 | `reflex-components-plotly` | 原计划的 ECharts 无 Reflex 封装，不值得写 custom component |
-| 认证 | `reflex-local-auth` | 见 [11](./11-认证与权限模块.md) |
+| 认证 | `reflex-local-auth` | 见 [09](./09-认证与权限模块.md) |
 | 手写 JS/TS | **无** | 全部 Python |
 
 ---
@@ -58,8 +56,7 @@ class BoardRowView(rx.Base):
 
 ### 2.2 BoardState：文件矩阵消失
 
-[05-数据导出与发布](./05-数据导出与发布模块.md) §5.4 要为 `mode × period` 每个组合预生成
-一个 JSON（`ratings/formal_only/season_2025-春学期.json` 等）。
+原「数据导出与发布」方案为 `mode × period` 每个组合预生成一个 JSON 文件（见 [05](05-数据导出与发布模块.md)，已降级为可选）。
 
 Reflex 里筛选条件只是 state var，切换即重查：
 
@@ -101,11 +98,10 @@ class BoardState(rx.State):
 | `/admin/users` | 用户与绑定审批 | admin |
 | `/admin/audit` | 审计日志 | admin |
 
-比赛详情合并为一个路由（原 [08](./08-前端展示模块.md) §4 分了 formal/training 两条），
-与 [10](./10-数据存储与迁移-SQLite.md) §4.1 的合表一致。
+比赛详情合并为一个路由（formal/training 同页），与 [10](10-数据存储与SQLite.md) §4.1 的合表一致。
 
 每个 `/admin/*` 与 `/profile` 都要挂 `on_load` 守卫，且页内私有数据必经带权限判断的
-computed var —— 见 [11](./11-认证与权限模块.md) §4。
+computed var —— 见 [09](./09-认证与权限模块.md) §4。
 
 ---
 
@@ -127,7 +123,7 @@ computed var —— 见 [11](./11-认证与权限模块.md) §4。
 └─────────────────────────────────────────────────────────┘
 ```
 
-与原 Vue 设计的差异：
+要点：
 
 - 搜索框实时过滤（服务端算，无需前端分页逻辑）
 - 列排序点表头即可，`sort_by` 是 state var
@@ -136,10 +132,9 @@ computed var —— 见 [11](./11-认证与权限模块.md) §4。
 
 ### 4.2 选手详情 `/players/{id}`
 
-沿用原 [08](./08-前端展示模块.md) §5.2 布局。新增：
-
-- 若当前用户绑定的就是本选手，右上角出现「编辑我的资料」入口
+- 基本信息 + OJ 账号 + 参赛记录（正式 / 训练 / OJ Tab）
 - Rating 曲线用 Plotly，支持按 `mode` 过滤
+- 若当前用户绑定的就是本选手，右上角出现「编辑我的资料」入口
 
 ### 4.3 我的资料 `/profile`
 
@@ -165,7 +160,7 @@ admin-only 字段以只读文本呈现并注明原因 —— 比隐藏更好，�
 
 ### 4.4 在线导入 `/admin/import`
 
-**这是本次改造的核心价值。** 现在导入 xlsx 要写一段 `python -c "from importer import ..."`。
+**这是改造的核心价值。** 导入 xlsx 不再需要写一段 `python -c "from importer import ..."`。
 
 ```
 步骤 1  上传          [选择 .xlsx]  [上传]
@@ -180,7 +175,7 @@ admin-only 字段以只读文本呈现并注明原因 —— 比隐藏更好，�
 
 关键设计：**解析结果先落 `ImportBatch`（`status=staged`），确认后才写正式表。**
 中途关页面不会产生半截数据；未匹配项由人工逐个决策，替代现在的
-`auto_create_players=True` 盲目自动建号。
+`auto_create_players=True` 盲目自动建号。业务流程见 [04](04-数据导入与加工模块.md) §5。
 
 ### 4.5 权重试算 `/admin/rating`
 
@@ -194,14 +189,14 @@ admin-only 字段以只读文本呈现并注明原因 —— 比隐藏更好，�
                        [放弃]  [应用并重算]
 ```
 
-试算不落库、不进缓存（见 [09](./09-Reflex-Web改造提案.md) §5）。
+试算不落库、不进缓存（见 [06](06-Rating计算模块.md) §3）。
 「应用」才写 YAML 并 bump `data_version`，记 `weights.apply` 审计。
 
 ### 4.6 其余管理页
 
 | 页面 | 要点 |
 |------|------|
-| `/admin/players` | 表格 + 弹窗表单；批量补 `grade`（现有 24 人全为 0） |
+| `/admin/players` | 表格 + 弹窗表单；批量补 `grade` |
 | `/admin/teams` | 队员集合识别，`member_key` 冲突时提示已存在的队 |
 | `/admin/contests` | 列表 + 删除（删比赛须级联删 standings 与 rating_events） |
 | `/admin/users` | 绑定审批：申请人 / 目标选手 / 说明 / [批准] [驳回] |
@@ -210,8 +205,6 @@ admin-only 字段以只读文本呈现并注明原因 —— 比隐藏更好，�
 ---
 
 ## 5. 组件
-
-沿用原 [08](./08-前端展示模块.md) §8 的划分思路，从 `.vue` 文件变为 Python 函数：
 
 ```
 xcpc_web/components/
@@ -269,9 +262,8 @@ xcpc_web/components/
 |----|------|
 | 榜单筛选是否同步到 URL | 建议同步，便于分享 |
 | 上传文件大小上限 | 待定，xlsx 通常 < 1MB，设 10MB 足够 |
-| 是否需要队伍详情页 | 原 08 文档亦未包含，二期再议 |
+| 是否需要队伍详情页 | 二期再议 |
 
 ---
 
-*文档版本：v1.0 — 提案，未实施。取代 [08-前端展示模块](./08-前端展示模块.md)（采纳后）。*
-
+*文档版本：v1.1 — 已采纳 Reflex；取代原 Vue 方案。*

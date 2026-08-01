@@ -1,8 +1,6 @@
-# 数据存储与迁移（SQLite）
+# 数据存储与 SQLite
 
-> **状态：提案 · 待评审 · 未实施**
-> 隶属于 [09-Reflex-Web改造提案](./09-Reflex-Web改造提案.md)
-> 关联：[03-比赛与记录](./03-比赛与记录模块.md) · [04-数据导入与加工](./04-数据导入与加工模块.md)
+> 关联：[DESIGN.md](DESIGN.md) · [比赛与记录](./03-比赛与记录模块.md) · [数据导入与加工](./04-数据导入与加工模块.md) · [认证与权限](./09-认证与权限模块.md)
 
 本文定义域数据从 JSON 全量读写迁移到 SQLite 的表结构、重构范围与迁移步骤。
 
@@ -138,7 +136,7 @@ class StandingMember(rx.Model, table=True):
     player_id: str = Field(foreign_key="player.id", index=True)
 ```
 
-**为什么合表**：[03-比赛与记录模块](./03-比赛与记录模块.md) 里 formal 与 training 本就共享
+**为什么合表**：[03-比赛与记录模块](03-比赛与记录模块.md) 里 formal 与 training 本就共享
 `competition_year` / `season` / `rated` / `weight` / `weight_source`，差异只在
 「权重由 `contest_type` 还是 `division` 决定」和「有没有 `total_teams`」。
 分成两张表会让榜单查询、`RatingEvent` 生成、比赛详情页各写两遍。
@@ -196,7 +194,7 @@ class RatingEvent(rx.Model, table=True):
     payload_json: str                                  # rank/solved/penalty/score/total_teams
 
 class Meta(rx.Model, table=True):
-    """单行表。data_version 供 Rating 缓存失效使用（见 09 §5）。"""
+    """单行表。data_version 供 Rating 缓存失效使用（见 [06](06-Rating计算模块.md) §3）。"""
     id: int = Field(primary_key=True, default=1)
     data_version: int = 0
     rating_algorithm: str = "placeholder_v0"
@@ -219,7 +217,7 @@ class ImportBatch(rx.Model, table=True):
     created_at: datetime
 ```
 
-用户与会话表见 [11-认证与权限模块](./11-认证与权限模块.md) §5。
+用户与会话表见 [09-认证与权限模块](09-认证与权限模块.md) §5。
 
 `RatingEvent` 与 `Meta` 是派生/运维数据，备份时可跳过 —— 前者能重建，后者只存一个版本号。
 
@@ -251,9 +249,9 @@ python -m xcpc_core.db.migrate_from_json        # 一次性灌数据
 
 | 问题 | 影响 | 建议 |
 |------|------|------|
-| 24 名选手 `grade` 全为 0 | 榜单年级列无意义 | 迁移后用 `/admin/players` 批量补 |
+| 选手 `grade` 全为 0 | 榜单年级列无意义 | 迁移后用 `/admin/players` 批量补 |
 | `oj_accounts` 全为空 | OJ 榜单无数据 | 二期上线后由队员自助填（这是多用户自助的直接价值） |
-| `data/processed/` 已被 gitignore 但仍有文件 | 与「由 pipeline 生成」的设计矛盾 | 迁移后该目录整体废弃，数据在 DB |
+| `data/processed/` 仍有文件 | 与「由 pipeline 生成」的设计矛盾 | 迁移后该目录整体废弃，数据在 DB |
 
 ---
 
@@ -308,7 +306,7 @@ PRAGMA 必须挂在 `connect` 事件上**逐连接执行** —— 连接池里�
 不持有 ORM 实例的一个附带理由：事务边界更容易看清。
 
 **长事务是最大的隐藏杀手。** 具体到本项目：xlsx 解析、Rating 全量重算都不要放在
-写事务里。这正是 [12](./12-Web交互与页面-Reflex.md) §4.4 用 `ImportBatch` 暂存的
+写事务里。这正是 [08](./08-前端与Web交互模块.md) §4.4 用 `ImportBatch` 暂存的
 另一个理由 —— 解析与落库分成两个短事务。
 
 ### 7.3 规模判断
@@ -325,12 +323,10 @@ Reflex 的 State 默认存在**进程内存的字典**里（按 client token 索
 多 worker 会导致同一用户的两次请求落到不同进程、看到不同 state。
 官方生产环境用 Redis 作 StateManager。
 
-**本项目单进程运行，不要加 `--workers`。** 见 [09](./09-Reflex-Web改造提案.md) §8。
+**本项目单进程运行，不要加 `--workers`。** 见 [11](./11-部署与运维.md) §6。
 这也顺带保证了 SQLite 只有一个进程在写。
 
 ### 7.5 备份
-
-替代原 DESIGN.md 的数据 cron：
 
 ```cron
 30 4 * * * sqlite3 /opt/xcpc-rating/data/db/xcpc.db ".backup '/var/backups/xcpc-$(date +\%F).db'"
@@ -352,5 +348,4 @@ Reflex 的 State 默认存在**进程内存的字典**里（按 client token 索
 
 ---
 
-*文档版本：v1.0 — 提案，未实施。*
-
+*文档版本：v1.1 — 已采纳。*

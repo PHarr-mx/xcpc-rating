@@ -13,7 +13,7 @@ description: >-
 1. 激活环境：`source ./setup_env.sh`（项目根目录）
 2. 数据文件：`data/raw/players/roster.json`
 
-详细 API 见 [docs/backend-player-module.md](../../docs/backend-player-module.md)。
+CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/12-开发流程建议.md) §3。
 
 ## 原则
 

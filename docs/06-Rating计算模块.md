@@ -10,11 +10,11 @@
 - 将 processed 事件流输入 Rating 引擎，按 `source_type` 分发到对应计算器
 - 算法与流水线**解耦**，每种比赛类型可独立替换公式
 
-> **榜单模式、时间维度、输出文件结构**由 [榜单模块](./07-榜单模块.md) 负责。
+> **榜单模式、时间维度、输出结构**由 [榜单模块](./07-榜单模块.md) 负责。
 
-> ⚠️ [09-Reflex-Web改造提案](./09-Reflex-Web改造提案.md)（待评审）**不改动本文的算法设计**。
-> 基类+继承体系直接实现即可；变的只是触发时机：从「构建期算完写 JSON」改为
-> 「运行时按需算 + `lru_cache` 按 `data_version` 失效」，另增权重试算路径（不落库）。
+> **触发时机（已确定）**：不在构建期写 JSON，而是**运行时按需算**：
+> `lru_cache` 按 `data_version`（单行 meta 表）失效，任何写操作令其 +1。
+> 另有权重试算路径（不落库、不进缓存），见 [08-前端与Web交互模块](08-前端与Web交互模块.md) §4.5。
 
 ---
 
@@ -235,21 +235,27 @@ class RatingEngine:
 ## 3. 计算流程
 
 ```
-rating_events.json (sorted by date)
+rating_events（派生表，按 date 排序）
         │
         ▼
 for mode in [formal_only, all]:
   for period in catalog.all_periods():
     events_filtered = filter(events, mode, period)
     snapshot = engine.compute(events_filtered, ...)
-    write ratings/{mode}/{period_key}.json
+    返回 BoardSnapshot（进 lru_cache，key = mode, period, data_version）
         │
         ▼
 for each player:
-  aggregate history → players/{id}.json
+  aggregate history → 选手详情（按需聚合）
 ```
 
-全量重算；数据量小（校内规模）时可接受。后期可对 `period` 做增量缓存。
+**运行时按需算**：`@lru_cache(maxsize=256)`，`data_version` 存单行 meta 表；
+任何写操作（改选手、导比赛、调权重）令其 +1，缓存自然失效。
+当前规模（校内选手、数十场比赛）全量重算是毫秒级，不需要增量缓存。
+
+**权重试算**走独立路径：用草稿权重计算，结果不落库、不进缓存，
+仅在页面上与当前榜单做 diff；admin 点「应用」才写
+`data/config/contest_weights.yaml` 并 bump `data_version`。
 
 ---
 

@@ -1,39 +1,37 @@
 # xcpc-rating
 
-XCPC 评级数据静态展示站。
+校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。
+
+> **技术路线（已采纳）**：Reflex（Python 全栈 Web）+ SQLite + Caddy 反向代理。
+> 原 Vue 3 静态站方案已废弃。实施计划见 [docs/13-实施路线图.md](docs/13-实施路线图.md)。
 
 ## 目录
 
 | 目录 | 说明 |
 |------|------|
-| [backend/](backend/) | Python 数据流水线 + 站点构建脚本 |
-| [data/](data/) | 数据文件（raw / config / processed） |
-| [docs/](docs/) | 设计文档、API 文档、Review |
-| [skill/](skill/) | Cursor Agent Skills |
+| [backend/](backend/) | Python 业务层（`player` / `team` / `importer`，将迁入 `xcpc_core`） |
+| [data/](data/) | 数据文件（raw / config / db） |
+| [docs/](docs/) | 设计文档、模块说明、开发手册 |
+| [skill/](skill/) | AI Agent Skills |
 
 ## 文档
 
 | 文档 | 说明 |
 |------|------|
-| [docs/DESIGN.md](docs/DESIGN.md) | 工程架构、目录、部署 |
-| [docs/backend.md](docs/backend.md) | Backend 模块概览 |
-| [docs/player-module.md](docs/player-module.md) | 选手模块 API + CLI（已实现） |
-| [docs/team-module.md](docs/team-module.md) | 队伍模块 API + CLI（已实现） |
-| [docs/formal-import.md](docs/formal-import.md) | 正式赛 xlsx 导入（已实现） |
-| [docs/contest-weights.md](docs/contest-weights.md) | 比赛权重配置（已实现） |
-| [docs/data-format.md](docs/data-format.md) | 数据目录与文件格式 |
+| [docs/DESIGN.md](docs/DESIGN.md) | 工程架构总览（已采纳 Reflex + SQLite） |
+| [docs/01-开发环境与工程结构.md](docs/01-开发环境与工程结构.md) | 目标工程结构、分层规则、迁移对应 |
+| [docs/03-比赛与记录模块.md](docs/03-比赛与记录模块.md) | 正式赛 / 训练赛 / OJ 三类数据源定义 |
+| [docs/04-数据导入与加工模块.md](docs/04-数据导入与加工模块.md) | raw → SQLite 导入、Web 交互式导入 |
+| [docs/05-数据导出与发布模块.md](docs/05-数据导出与发布模块.md) | 可选只读导出 / 备份 |
+| [docs/06-Rating计算模块.md](docs/06-Rating计算模块.md) | Rating 引擎（基类 + 继承体系） |
+| [docs/07-榜单模块.md](docs/07-榜单模块.md) | 双榜模式、时间维度、排名规则 |
+| [docs/08-前端与Web交互模块.md](docs/08-前端与Web交互模块.md) | Reflex State / 路由 / 页面 |
+| [docs/09-认证与权限模块.md](docs/09-认证与权限模块.md) | 角色、用户↔选手绑定、字段级权限 |
+| [docs/10-数据存储与SQLite.md](docs/10-数据存储与SQLite.md) | SQLite 表结构、迁移、运维 |
+| [docs/11-部署与运维.md](docs/11-部署与运维.md) | Caddy / systemd / 备份 |
+| [docs/12-开发流程建议.md](docs/12-开发流程建议.md) | 开发手册：环境、约定、避坑 |
+| [docs/13-实施路线图.md](docs/13-实施路线图.md) | 五期实施计划 |
 | [docs/skills.md](docs/skills.md) | AI Agent Skills |
-| [docs/design/](docs/design/README.md) | 业务模块设计（未实现模块的蓝图） |
-| [docs/PROJECT_REVIEW.md](docs/PROJECT_REVIEW.md) | 项目整体 Review（2026-06-30） |
-| [docs/需求文档.txt](docs/需求文档.txt) | 原始需求 |
-
-## 待评审提案
-
-| 文档 | 说明 |
-|------|------|
-| [docs/design/09-Reflex-Web改造提案.md](docs/design/09-Reflex-Web改造提案.md) | **待评审**：用 Reflex 改造为可交互 Web 应用（含 10/11/12 三份配套设计） |
-
-该提案会替换当前「静态站 + 无运行时后端」的架构，**尚未采纳**。评审从 09 读起。
 
 ## 环境
 
@@ -57,7 +55,7 @@ python -m player.cli list --visible-only
 python -m player.cli get p001 --json
 
 # 队伍管理
-python -m team.cli list --school-only
+python -m team.cli list
 python -m team.cli find --members p001 p002
 
 # 正式赛导入（Python API）
@@ -76,10 +74,10 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 cd backend && python -m pytest data/tests/ data/import/tests/ utils/tests/ -v
 ```
 
-## 待实现
+## 实施状态
 
-```bash
-xcpc-data update      # 更新 data/public/
-xcpc-site build       # 构建 frontend/dist/
-xcpc-site deploy      # 部署到服务器
-```
+当前完成：选手/队伍 CRUD、正式赛 xlsx 导入（JSON 数据层）。
+
+按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 推进五期改造：
+`pyproject 打包 → Reflex 骨架 → 认证 → 管理后台 → Rating 计算 → 上线`。
+开发指引见 [docs/12-开发流程建议.md](docs/12-开发流程建议.md)。
