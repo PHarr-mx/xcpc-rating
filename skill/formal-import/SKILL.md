@@ -20,7 +20,7 @@ description: >-
 
 | `source_format` | 文件 | 实现 |
 |-----------------|------|------|
-| `xcpcio_xlsx` | XCPC.io 导出 `.xlsx` | `importer.import_formal_xcpcio_xlsx` |
+| `xcpcio_xlsx` | XCPC.io 导出 `.xlsx` | `xcpc_core.importer.import_formal_xcpcio_xlsx` |
 
 详细字段说明见 [docs/04-数据导入与加工模块.md](../../docs/04-数据导入与加工模块.md) §4。导入流程与 Web 交互式导入见同文档 §5。
 
@@ -52,8 +52,8 @@ description: >-
 ### 2. 预览解析（推荐）
 
 ```python
-from importer import parse_xcpcio_xlsx
-from importer.config import load_school_organizations
+from xcpc_core.importer import parse_xcpcio_xlsx
+from xcpc_core.importer.config import load_school_organizations
 
 parsed = parse_xcpcio_xlsx(
     "比赛文件.xlsx",
@@ -71,9 +71,9 @@ for row in parsed.standings:
 ```python
 from datetime import date
 
-from importer import FormalImportParams, import_formal_xcpcio_xlsx
-from importer.config import load_school_organizations
-from utils import Plog
+from xcpc_core.importer import FormalImportParams, import_formal_xcpcio_xlsx
+from xcpc_core.importer.config import load_school_organizations
+from xcpc_core.utils import Plog
 
 plog = Plog(name="formal-import")
 result = import_formal_xcpcio_xlsx(
@@ -98,8 +98,8 @@ plog.close()
 从 xlsx **`所有队伍`** 工作表查找该队（`Organization` 可能不是本校），确认 `rank` / `solved` / `penalty` / `Unofficial`。
 
 ```python
-from importer import AddFormalTeamParams, add_formal_team
-from utils import Plog
+from xcpc_core.importer import AddFormalTeamParams, add_formal_team
+from xcpc_core.utils import Plog
 
 plog = Plog(name="formal-import")
 result = add_formal_team(
@@ -160,11 +160,11 @@ plog.close()
 
 ## 修改代码时
 
-- 解析逻辑：`backend/data/import/xcpcio_xlsx.py`
-- 获奖计算：`backend/data/import/awards.py`
-- 导入编排：`backend/data/import/formal.py`
-- 队员解析/建档：`backend/data/import/players.py`
-- 测试：`pytest backend/data/import/tests`
+- 解析逻辑：`xcpc_core/importer/xcpcio_xlsx.py`
+- 获奖计算：`xcpc_core/importer/awards.py`
+- 导入编排：`xcpc_core/importer/formal.py`
+- 队员解析/建档：`xcpc_core/importer/players.py`
+- 测试：`pytest xcpc_core/importer/tests`
 
 ## 禁止事项
 

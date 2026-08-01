@@ -2,7 +2,7 @@
 name: player-manage
 description: >-
   管理 xcpc-rating 选手名册（增删改查、别名、OJ 账号、离队）。
-  通过 player.api 或 xcpc-player CLI 操作 data/raw/players/roster.json。
+  通过 xcpc_core.player.api 或 xcpc-player CLI 操作 data/raw/players/roster.json。
   在用户提到选手、名册、roster、建档、离队、别名、handle、入学年、player_id 时使用。
 ---
 
@@ -17,7 +17,7 @@ CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/1
 
 ## 原则
 
-- **必须通过 `player.api` 或 CLI**，不要手改 `roster.json`
+- **必须通过 `xcpc_core.player.api` 或 CLI**，不要手改 `roster.json`
 - 编程 API 与 CLI 共用同一套逻辑
 - `grade=0` 表示入学年未设置（导入自动建档默认值，见 `school.yaml`）
 - `id` 省略时自动生成 `p001`、`p002`…（全局递增，不含年份）
@@ -50,7 +50,7 @@ CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/1
 ## 编程 API（推荐）
 
 ```python
-from player import (
+from xcpc_core.player import (
     create_player,
     delete_player,
     find_by_name,
@@ -60,8 +60,8 @@ from player import (
     mark_left,
     update_player,
 )
-from player.models import OJAccount, PlayerCreate, PlayerStatus, PlayerUpdate
-from utils import Plog
+from xcpc_core.player.models import OJAccount, PlayerCreate, PlayerStatus, PlayerUpdate
+from xcpc_core.utils import Plog
 ```
 
 ### 查询
@@ -142,7 +142,7 @@ xcpc-player update p001 \
 xcpc-player mark-left p001
 ```
 
-未安装入口脚本时：`python -m player.cli <子命令>`（需已 `source ./setup_env.sh`）。
+未安装入口脚本时：`python -m xcpc_core.player.cli <子命令>`（需已 `source ./setup_env.sh`）。
 
 ## 常见场景
 
@@ -165,10 +165,10 @@ xcpc-player mark-left p001
 
 ## 修改代码时
 
-- API：`backend/data/player/api.py`
-- 业务逻辑：`backend/data/player/service.py`
-- CLI：`backend/data/player/cli.py`
-- 测试：`pytest backend/data/tests`
+- API：`xcpc_core/player/api.py`
+- 业务逻辑：`xcpc_core/player/service.py`
+- CLI：`xcpc_core/player/cli.py`
+- 测试：`pytest xcpc_core/tests`
 
 ## 禁止事项
 

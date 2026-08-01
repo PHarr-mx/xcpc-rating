@@ -9,7 +9,7 @@
 
 | 目录 | 说明 |
 |------|------|
-| [backend/](backend/) | Python 业务层（`player` / `team` / `importer`，将迁入 `xcpc_core`） |
+| [xcpc_core/](xcpc_core/) | Python 业务层（`player` / `team` / `importer` / `utils`） |
 | [data/](data/) | 数据文件（raw / config / db） |
 | [docs/](docs/) | 设计文档、模块说明、开发手册 |
 | [skill/](skill/) | AI Agent Skills |
@@ -36,32 +36,32 @@
 ## 环境
 
 ```bash
-source ./setup_env.sh   # 创建 conda 环境、安装依赖、设置 PYTHONPATH
+source ./setup_env.sh   # uv sync + 激活 .venv
 ```
 
-或手动：
+依赖与 Python 版本由 `pyproject.toml`（+ `.python-version` = 3.13）统一管理：
 
 ```bash
-conda create -n xcpc_rating python=3.13 pip -y
-conda activate xcpc_rating
-pip install -r requirements.txt
+uv python install 3.13
+uv sync
+uv run python -m pytest xcpc_core -v
 ```
 
 ## 常用命令
 
 ```bash
 # 选手管理
-python -m player.cli list --visible-only
-python -m player.cli get p001 --json
+python -m xcpc_core.player.cli list --visible-only
+python -m xcpc_core.player.cli get p001 --json
 
 # 队伍管理
-python -m team.cli list
-python -m team.cli find --members p001 p002
+python -m xcpc_core.team.cli list
+python -m xcpc_core.team.cli find --members p001 p002
 
 # 正式赛导入（Python API）
 python -c "
-from importer import FormalImportParams, import_formal_xcpcio_xlsx
-from importer.config import load_school_organizations
+from xcpc_core.importer import FormalImportParams, import_formal_xcpcio_xlsx
+from xcpc_core.importer.config import load_school_organizations
 from datetime import date
 result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
     contest_id='2026_xxx', date=date(2026,5,18),
@@ -71,7 +71,7 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 "
 
 # 运行测试
-cd backend && python -m pytest data/tests/ data/import/tests/ utils/tests/ -v
+uv run python -m pytest xcpc_core -v
 ```
 
 ## 实施状态

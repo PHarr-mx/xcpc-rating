@@ -2,7 +2,7 @@
 name: team-manage
 description: >-
   管理 xcpc-rating 队伍名册（增删改查、别名、按队员查找）。
-  通过 team.api 或 xcpc-team CLI 操作 data/raw/teams/roster.json。
+  通过 xcpc_core.team.api 或 xcpc-team CLI 操作 data/raw/teams/roster.json。
   在用户提到队伍、名册、建队、别名、team_id、member_key、队员查找时使用。
 ---
 
@@ -17,7 +17,7 @@ CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/1
 
 ## 原则
 
-- **必须通过 `team.api` 或 CLI**，不要手改 `roster.json`
+- **必须通过 `xcpc_core.team.api` 或 CLI**，不要手改 `roster.json`
 - 编程 API 与 CLI 共用同一套逻辑
 - 队伍身份由**队员集合**（`member_key`）决定，队名不参与
 - 队员相同但队名不同 → 同一队伍，新队名追加到 `aliases`
@@ -50,7 +50,7 @@ CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/1
 ## 编程 API（推荐）
 
 ```python
-from team import (
+from xcpc_core.team import (
     create_team,
     delete_team,
     find_by_members,
@@ -58,9 +58,9 @@ from team import (
     list_teams,
     update_team,
 )
-from team.models import TeamCreate, TeamUpdate
-from team.service import TeamService
-from utils import Plog
+from xcpc_core.team.models import TeamCreate, TeamUpdate
+from xcpc_core.team.service import TeamService
+from xcpc_core.utils import Plog
 ```
 
 ### 查询
@@ -99,7 +99,7 @@ plog.close()
 team = update_team("t001", TeamUpdate(alias="新队名"))
 
 # 方式二：add_alias（直接操作 service）
-from team.service import TeamService
+from xcpc_core.team.service import TeamService
 service = TeamService()
 team = service.add_alias("t001", "新队名")
 ```
@@ -132,13 +132,13 @@ xcpc-team update t001 --alias "新队名" [--json]
 xcpc-team delete t001 [--json]
 ```
 
-未安装入口脚本时：`python -m team.cli <子命令>`（需已 `source ./setup_env.sh`）。
+未安装入口脚本时：`python -m xcpc_core.team.cli <子命令>`（需已 `source ./setup_env.sh`）。
 
 ## 常见场景
 
 | 场景 | 做法 |
 |------|------|
-| 导入比赛后队伍自动建档 | 由 `importer.resolve_team()` 调用 `find_by_member_key` + `create_team` |
+| 导入比赛后队伍自动建档 | 由 `xcpc_core.importer.resolve_team()` 调用 `find_by_member_key` + `create_team` |
 | 同一队换了队名 | 队员相同 → `add_alias` 追加新队名，不新建 |
 | 队员换人 | 成员集合变了 → 创建新队伍 |
 | 导入时发现已有队伍 | 自动匹配 `member_key`，队名不同则追加 alias |
@@ -146,7 +146,7 @@ xcpc-team delete t001 [--json]
 
 ## 与 Formal Import 的协作
 
-正式赛导入（`backend/data/import/formal.py`）中的 `resolve_team()` 已集成队伍管理：
+正式赛导入（`xcpc_core/importer/formal.py`）中的 `resolve_team()` 已集成队伍管理：
 
 ```python
 def resolve_team(player_ids, team_name, store):
@@ -176,12 +176,12 @@ def resolve_team(player_ids, team_name, store):
 
 ## 修改代码时
 
-- API：`backend/data/team/api.py`
-- 业务逻辑：`backend/data/team/service.py`
-- 数据模型：`backend/data/team/models.py`
-- 存储层：`backend/data/team/store.py`
-- CLI：`backend/data/team/cli.py`
-- 测试：`pytest backend/data/tests/test_team_crud.py`
+- API：`xcpc_core/team/api.py`
+- 业务逻辑：`xcpc_core/team/service.py`
+- 数据模型：`xcpc_core/team/models.py`
+- 存储层：`xcpc_core/team/store.py`
+- CLI：`xcpc_core/team/cli.py`
+- 测试：`pytest xcpc_core/tests/test_team_crud.py`
 
 ## 禁止事项
 

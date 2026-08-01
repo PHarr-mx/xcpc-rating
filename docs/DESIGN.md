@@ -100,7 +100,7 @@ data/public/（可选只读导出 / 备份快照）
 |------|------|
 | Web 框架 | Reflex（Python 全栈，编译 React SPA） |
 | 数据库 | SQLite（WAL 模式） |
-| 数据模型 | Pydantic（DTO）+ rx.Model（ORM），显式互转 |
+| 数据模型 | Pydantic（DTO）+ SQLAlchemy（ORM），显式互转 |
 | 认证 | `reflex-local-auth` |
 | 部署 | Caddy `reverse_proxy` + systemd |
 | 包管理 | `pyproject.toml`（统一打包，替代 PYTHONPATH hack） |

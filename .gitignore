@@ -1,6 +1,7 @@
 # 数据缓存与构建产物
 data/processed/
 data/public/.staging/
+data/db/
 logs/
 
 # 前端

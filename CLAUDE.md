@@ -12,36 +12,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
-环境（conda 环境 `xcpc_rating`、安装依赖、设置 `PYTHONPATH` 与 `XCPC_RATING_ROOT`）：
+环境（`uv sync` + 激活 `.venv`，Python 3.13 由 `.python-version` 锁定）：
 
 ```bash
-source ./setup_env.sh    # 必须在项目根目录 source
+source ./setup_env.sh    # 必须在项目根目录 source（uv 版）
 ```
 
-测试（须在 `backend/` 下运行，且 `PYTHONPATH` 已生效）：
+测试（项目根目录）：
 
 ```bash
-cd backend && python -m pytest data/tests/ data/import/tests/ utils/tests/ -v
+uv run python -m pytest xcpc_core -v
 # 单个测试
-cd backend && python -m pytest data/tests/test_team_crud.py -v
+uv run python -m pytest xcpc_core/tests/test_team_crud.py -v
 ```
 
 选手 / 队伍 CLI（`python -m <包>.cli`，在项目根目录运行）：
 
 ```bash
-python -m player.cli list --visible-only
-python -m player.cli get p001 --json
-python -m team.cli list
-python -m team.cli find --members p001 p002
-python -m team.cli create --members p001 p002 --aliases 队名
+python -m xcpc_core.player.cli list --visible-only
+python -m xcpc_core.player.cli get p001 --json
+python -m xcpc_core.team.cli list
+python -m xcpc_core.team.cli find --members p001 p002
+python -m xcpc_core.team.cli create --members p001 p002 --aliases 队名
 ```
 
 正式赛导入（Python API，`source ./setup_env.sh` 后）：
 
 ```python
 from datetime import date
-from importer import FormalImportParams, import_formal_xcpcio_xlsx
-from importer.config import load_school_organizations
+from xcpc_core.importer import FormalImportParams, import_formal_xcpcio_xlsx
+from xcpc_core.importer.config import load_school_organizations
 
 result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
     contest_id='2026_xxx',
@@ -57,12 +57,13 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 
 ### 包命名空间
 
-包为**顶层命名空间**，靠 `PYTHONPATH` 注入，不是嵌套包：
+包为**单顶层包** `xcpc_core`（下含 `player`/`team`/`importer`/`utils`），由 `pyproject.toml` 安装解析，非 PYTHONPATH hack：
 
-- `backend/data/` → `player`、`team`、`importer`
-- `backend/` → `utils`（目前仅 `plog.py`）
+- `xcpc_core/player/`、`xcpc_core/team/` → CRUD 模块
+- `xcpc_core/importer/` → 数据导入
+- `xcpc_core/utils/` → `Plog`（双写日志）
 
-`setup_env.sh` 设置 `PYTHONPATH="${ROOT}/backend/data:${ROOT}/backend"`。因此 `import player`、`from utils import Plog` 均可用，但模块间无法用相对导入。
+`import xcpc_core.player`、`from xcpc_core.utils import Plog` 可用。后续 `xcpc_web/`（Reflex）为另一顶层包，**只依赖 `xcpc_core`，不反向依赖**。
 
 ### 数据流
 
@@ -73,7 +74,7 @@ data/raw/（人工投放 + import 写入）
   ├── formal/{contest_id}.json 正式赛（含 standings、award_thresholds、weight）
   └── (训练赛 / OJ 数据源：设计中)
         │
-        ▼ import（importer.*）
+        ▼ import（xcpc_core.importer.*）
         ▼ （设计中的 SQLite → Rating 计算 → 榜单；public/ 仅可选导出）
 ```
 
@@ -93,21 +94,21 @@ data/raw/（人工投放 + import 写入）
 | `exceptions.py` | 模块基础异常 + 子类 |
 | `__init__.py` | 统一 re-export |
 
-代表路径：`backend/data/player/{models,store,service,api,cli,exceptions}.py`。
+代表路径：`xcpc_core/player/{models,store,service,api,cli,exceptions}.py`。
 
 ### 关键约定
 
-- **禁止直接读写 JSON 文件**，必须经 `player.api` / `team.api`（或 CLI，CLI 与 API 共用同一套 service 逻辑）。
+- **禁止直接读写 JSON 文件**，必须经 `xcpc_core.player.api` / `xcpc_core.team.api`（或 CLI，CLI 与 API 共用同一套 service 逻辑）。
 - 各包以 `find_repo_root()` 定位仓库根：基于 `data/` 标志文件向上搜索（`player.store` 看 `data/raw/players/roster.json`，`team.store` 看 `data/config/school.yaml`）。测试用 `repo_root=tmp_path` 注入临时仓库。
 - ID 自动生成：选手 `p001`、队伍 `t001`（全局递增，`XxxStore.next_id()`）。选手 `grade=0` 表示入学年未设置。
 - 选手软删除 = `status=left`（`mark_left`）；`delete_player` 为物理删除。
 - **队伍身份由队员集合决定**，与队名无关：`make_member_key` = 排序后 `"p001|p002|p003"`；同名队员不同队名 → 同一队伍（队名进 `aliases`）；换员 → 新队伍。
-- 日志用 `utils.plog.Plog`（终端 + `logs/*.jsonl` 双写），在 CLI 入口实例化后传入下游函数。
+- 日志用 `xcpc_core.utils.Plog`（终端 + `logs/*.jsonl` 双写），在 CLI 入口实例化后传入下游函数。
 - 选手/队伍数据模型要点见 `skill/player-manage/SKILL.md` 与 `skill/team-manage/SKILL.md`。
 
 ## 文档与实现状态
 
 - `docs/` 是**已采纳设计**：`DESIGN.md` 为架构总览（Reflex + SQLite），`01` 工程结构，`03`–`11` 业务模块设计，`12` 开发流程建议，`13` 实施路线图。
-- **已实现**：选手、队伍 CRUD 与正式赛导入（`backend/data/`，JSON 数据层）。**设计蓝图**：SQLite 存储（`10`）、Rating 计算器（`06`，基类+继承）、榜单（`07`）、Reflex 前端（`08`）、认证（`09`）、部署（`11`）。
+- **已实现**：选手、队伍 CRUD 与正式赛导入（`xcpc_core/`，JSON 数据层）。**设计蓝图**：SQLite 存储（`10`）、Rating 计算器（`06`，基类+继承）、榜单（`07`）、Reflex 前端（`08`）、认证（`09`）、部署（`11`）。
 - 原 Vue 静态站方案与 Reflex 提案文档已删除（留 Git 历史）。
 - `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流建议见 `docs/12-开发流程建议.md`。
