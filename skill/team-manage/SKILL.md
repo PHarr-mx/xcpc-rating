@@ -2,7 +2,7 @@
 name: team-manage
 description: >-
   管理 xcpc-rating 队伍名册（增删改查、别名、按队员查找）。
-  通过 xcpc_core.team.api 或 xcpc-team CLI 操作 data/raw/teams/roster.json。
+  数据存 SQLite（data/db/xcpc.db），通过 xcpc_core.team.api 或 xcpc-team CLI 操作。
   在用户提到队伍、名册、建队、别名、team_id、member_key、队员查找时使用。
 ---
 
@@ -11,13 +11,13 @@ description: >-
 ## 前置条件
 
 1. 激活环境：`source ./setup_env.sh`（项目根目录）
-2. 数据文件：`data/raw/teams/roster.json`
+2. 数据存储：SQLite `data/db/xcpc.db`（`data/raw/teams/roster.json` 仅为一次性迁移源）
 
 CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/12-开发流程建议.md) §3。
 
 ## 原则
 
-- **必须通过 `xcpc_core.team.api` 或 CLI**，不要手改 `roster.json`
+- **必须通过 `xcpc_core.team.api` 或 CLI**，不要绕过 API 直接改存储（SQLite / raw JSON）
 - 编程 API 与 CLI 共用同一套逻辑
 - 队伍身份由**队员集合**（`member_key`）决定，队名不参与
 - 队员相同但队名不同 → 同一队伍，新队名追加到 `aliases`
@@ -185,6 +185,6 @@ def resolve_team(player_ids, team_name, store):
 
 ## 禁止事项
 
-- 不要直接编辑 `data/raw/teams/roster.json`
+- 不要绕过 API 直接改 SQLite 或 raw JSON（`roster.json` 只是迁移源，不是数据事实）
 - 未经用户要求不要 `git commit`
 - 不要通过 `update_team` 修改 `members`（换员应创建新队）

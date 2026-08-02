@@ -2,8 +2,8 @@
 name: player-manage
 description: >-
   管理 xcpc-rating 选手名册（增删改查、别名、OJ 账号、离队）。
-  通过 xcpc_core.player.api 或 xcpc-player CLI 操作 data/raw/players/roster.json。
-  在用户提到选手、名册、roster、建档、离队、别名、handle、入学年、player_id 时使用。
+  数据存 SQLite（data/db/xcpc.db），通过 xcpc_core.player.api 或 xcpc-player CLI 操作。
+  在用户提到选手、名册、建档、离队、别名、handle、入学年、player_id 时使用。
 ---
 
 # 选手管理
@@ -11,13 +11,13 @@ description: >-
 ## 前置条件
 
 1. 激活环境：`source ./setup_env.sh`（项目根目录）
-2. 数据文件：`data/raw/players/roster.json`
+2. 数据存储：SQLite `data/db/xcpc.db`（`data/raw/players/roster.json` 仅为一次性迁移源）
 
 CRUD 模块分层与迁移约定见 [docs/12-开发流程建议.md](../../docs/12-开发流程建议.md) §3。
 
 ## 原则
 
-- **必须通过 `xcpc_core.player.api` 或 CLI**，不要手改 `roster.json`
+- **必须通过 `xcpc_core.player.api` 或 CLI**，不要绕过 API 直接改存储（SQLite / raw JSON）
 - 编程 API 与 CLI 共用同一套逻辑
 - `grade=0` 表示入学年未设置（导入自动建档默认值，见 `school.yaml`）
 - `id` 省略时自动生成 `p001`、`p002`…（全局递增，不含年份）
@@ -172,6 +172,6 @@ xcpc-player mark-left p001
 
 ## 禁止事项
 
-- 不要直接编辑 `data/raw/players/roster.json`
+- 不要绕过 API 直接改 SQLite 或 raw JSON（`roster.json` 只是迁移源，不是数据事实）
 - 未经用户要求不要 `git commit`
 - 物理删除前确认无历史成绩关联需求（优先 `mark_left`）

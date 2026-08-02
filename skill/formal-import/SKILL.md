@@ -2,7 +2,7 @@
 name: formal-import
 description: >-
   导入 xcpc-rating 正式比赛数据（当前支持 XCPC.io xlsx，source_format=xcpcio_xlsx）。
-  解析榜单、按本校 Organization 过滤、自动建档缺失队员、写入 raw；
+  解析榜单、按本校 Organization 过滤、自动建档缺失队员、写 SQLite + raw 归档；
   支持 add_formal_team 手动补录未挂靠本校的打星队。
   在用户提到正式赛导入、xcpcio、xlsx 榜单、formal import、补录队伍、省赛/区域赛成绩入库时使用。
 
@@ -66,7 +66,7 @@ for row in parsed.standings:
 
 ### 3. 执行导入
 
-**必须通过 `importer` API**，不要手改 `data/raw/formal/*.json`。
+**必须通过 `importer` API**，不要手改 `data/raw/formal/*.json`；导入结果写 SQLite（`Contest`/`Standing` 表，运行时数据源），raw 为可复现归档。
 
 ```python
 from datetime import date
@@ -93,7 +93,7 @@ plog.close()
 
 ### 5. 手动补录队伍
 
-打星队或外校挂靠导致 xlsx 自动导入遗漏时，在**已完成 import** 后使用 `add_formal_team` 追加单支队伍到 raw 文件。
+打星队或外校挂靠导致 xlsx 自动导入遗漏时，在**已完成 import** 后使用 `add_formal_team` 追加单支队伍（raw + SQLite 同步更新）。
 
 从 xlsx **`所有队伍`** 工作表查找该队（`Organization` 可能不是本校），确认 `rank` / `solved` / `penalty` / `Unofficial`。
 
@@ -119,7 +119,7 @@ result = add_formal_team(
 plog.close()
 ```
 
-- 写入已有 `data/raw/formal/{basename}.json` 的 `standings`，标记 `manually_added: true`
+- 追加到已有 `data/raw/formal/{basename}.json` 的 `standings`（标记 `manually_added: true`），并同步写入 SQLite
 - `award` 可省略，按文件中 `award_thresholds` 推算；未达奖线会报错
 - 同队员 `team_id` 已存在则覆盖更新
 - 自动建档队员逻辑与 import 相同
@@ -136,8 +136,9 @@ plog.close()
 
 写入位置：
 
-- `data/raw/formal/{basename}.json`
-- `data/raw/players/roster.json`（自动建档时更新）
+- SQLite：`Contest` / `Standing` 表（运行时数据源）
+- `data/raw/formal/{basename}.json`（可复现归档，import 写回）
+- 自动建档选手 → SQLite `player` 表（不再写 roster.json）
 
 ## xcpcio_xlsx 要点
 
@@ -154,7 +155,7 @@ plog.close()
 |------|------|
 | 本校队伍数为 0 | 检查 `school.yaml` 的 `organizations` 是否与 xlsx 中 `Organization` 一致 |
 | 本校无获奖队伍 | 不会写入 standings；检查奖线或本校成绩 |
-| `unmatched_players`（姓名歧义） | 在 roster 中消歧或补 `aliases`，勿自动建档 |
+| `unmatched_players`（姓名歧义） | 在选手名册（DB）中消歧或补 `aliases`，勿自动建档 |
 | `unmatched_teams` | 查看 `reason`；修复名册后重新 import（同 `contest_id` 会覆盖） |
 | 打星队未挂靠本校、自动导入遗漏 | 从 xlsx `所有队伍` 查成绩后调用 `add_formal_team` |
 
