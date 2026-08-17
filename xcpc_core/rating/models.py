@@ -35,6 +35,13 @@ class PeriodFilter(BaseModel):
     end: date | None = None
 
 
+class EventScore(BaseModel):
+    """单次事件对某选手的得分贡献（占位公式下即该事件得分，已含权重）。"""
+
+    date: date
+    score: float
+
+
 class PlayerScore(BaseModel):
     player_id: str
     rating: float

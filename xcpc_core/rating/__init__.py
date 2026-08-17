@@ -11,10 +11,17 @@ from xcpc_core.rating.calculators import (
 )
 from xcpc_core.rating.engine import RatingEngine
 from xcpc_core.rating.events import build_events_from_contests
-from xcpc_core.rating.models import PeriodFilter, PlayerScore, RatingEvent, RatingResult
+from xcpc_core.rating.models import (
+    EventScore,
+    PeriodFilter,
+    PlayerScore,
+    RatingEvent,
+    RatingResult,
+)
 
 __all__ = [
     "BaseRatingCalculator",
+    "EventScore",
     "FormalCalculator",
     "OjContestCalculator",
     "OjPracticeCalculator",

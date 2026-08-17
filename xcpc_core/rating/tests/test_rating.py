@@ -91,6 +91,28 @@ def test_engine_period_filter():
     assert result.scores[0].event_count == 1
 
 
+def test_engine_compute_series_sorted_by_date():
+    events = [
+        _evt("e2", player_id="p001", date_=date(2026, 8, 1), payload={"rank": 3, "total_teams": 10, "solved": 5}),
+        _evt("e1", player_id="p001", date_=date(2026, 5, 18), payload={"rank": 1, "total_teams": 10, "solved": 5}),
+        _evt("t1", player_id="p002", source_type="training", date_=date(2026, 4, 1),
+             contest_format="solo_xcpc", payload={"rank": 1, "player_count": 20, "solved": 5, "size": 1}),
+    ]
+    engine = RatingEngine()
+    series = engine.compute_series(events, mode="all", period=PeriodFilter())
+
+    p001 = series["p001"]
+    assert [item.date for item in p001] == [date(2026, 5, 18), date(2026, 8, 1)]  # 按 date 升序
+    assert p001[0].score == pytest.approx(1250.0)  # rank1 / 10 队
+    assert p001[1].score == pytest.approx(1050.0)  # rank3 / 10 队
+    assert len(series["p002"]) == 1
+    # 聚合结果与 compute 一致
+    result = engine.compute(events, mode="all", period=PeriodFilter())
+    p001_agg = next(s for s in result.scores if s.player_id == "p001")
+    assert p001_agg.rating == pytest.approx(1250.0 + 1050.0)
+    assert p001_agg.event_count == 2
+
+
 def test_build_events_from_contests_and_api(db_session):
     contest_api.save_contest(ContestCreate(
         id="contest_rating",

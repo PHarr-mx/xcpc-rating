@@ -12,7 +12,13 @@ from xcpc_core.rating.calculators import (
     OjPracticeCalculator,
     TrainingDispatcher,
 )
-from xcpc_core.rating.models import PeriodFilter, PlayerScore, RatingEvent, RatingResult
+from xcpc_core.rating.models import (
+    EventScore,
+    PeriodFilter,
+    PlayerScore,
+    RatingEvent,
+    RatingResult,
+)
 
 
 class RatingEngine:
@@ -24,6 +30,27 @@ class RatingEngine:
             "oj_practice": OjPracticeCalculator(),
         }
 
+    def compute_series(
+        self,
+        events: list[RatingEvent],
+        *,
+        mode: str,
+        period: PeriodFilter,
+    ) -> dict[str, list[EventScore]]:
+        """过滤后按选手聚合得分序列（按 date 升序）。
+
+        供榜单模块取每选手的得分明细（如 ``delta_recent`` 与选手历史）。
+        """
+        filtered = self._filter(events, mode=mode, period=period)
+        series: dict[str, list[EventScore]] = {}
+        for event in filtered:
+            calc = self.calculators[event.source_type]
+            score = calc.compute(event)
+            series.setdefault(event.player_id, []).append(EventScore(date=event.date, score=score))
+        for values in series.values():
+            values.sort(key=lambda item: item.date)
+        return series
+
     def compute(
         self,
         events: list[RatingEvent],
@@ -31,16 +58,14 @@ class RatingEngine:
         mode: str,
         period: PeriodFilter,
     ) -> RatingResult:
-        filtered = self._filter(events, mode=mode, period=period)
-        scores: dict[str, list[float]] = {}
-        for event in filtered:
-            calc = self.calculators[event.source_type]
-            score = calc.compute(event)
-            scores.setdefault(event.player_id, []).append(score)
-
+        series = self.compute_series(events, mode=mode, period=period)
         rows = [
-            PlayerScore(player_id=player_id, rating=round(sum(values), 2), event_count=len(values))
-            for player_id, values in scores.items()
+            PlayerScore(
+                player_id=player_id,
+                rating=round(sum(item.score for item in values), 2),
+                event_count=len(values),
+            )
+            for player_id, values in series.items()
         ]
         rows.sort(key=lambda row: (-row.rating, row.player_id))
         return RatingResult(mode=mode, period=period, scores=rows)

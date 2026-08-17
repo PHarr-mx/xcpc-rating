@@ -33,11 +33,15 @@ def build_events_from_contests(
             if not player_ids:
                 continue
             payload = {
-                "rank": standing.rank,
-                "solved": standing.solved,
-                "penalty": standing.penalty,
-                "score": standing.score,
-                "award": standing.award,
+                key: value
+                for key, value in {
+                    "rank": standing.rank,
+                    "solved": standing.solved,
+                    "penalty": standing.penalty,
+                    "score": standing.score,
+                    "award": standing.award,
+                }.items()
+                if value is not None
             }
             if contest.source_type == "formal":
                 payload["total_teams"] = contest.total_teams

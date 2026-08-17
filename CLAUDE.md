@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），已实现选手/队伍 CRUD、正式赛导入、contest 与 rating 模块（placeholder 公式）；榜单（board）与 Reflex 前端为下一步。
+校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），已实现选手/队伍 CRUD、正式赛导入、contest 与 rating 模块（placeholder 公式）、board 榜单聚合；Reflex 前端为下一步。
 
 技术栈：Python 3.13、pydantic v2、openpyxl、PyYAML、SQLAlchemy 2.0。原始数据以 JSON 存于 `data/raw/`（逐字可 diff、可进 Git，import 后写回归档），运行时数据在 SQLite（`data/db/xcpc.db`）。
 
-> Reflex + SQLite 方案**已采纳**（`docs/DESIGN.md` v4.0）。按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 已完成一期「地基」：打包、建表、JSON 一次性迁移、contest/rating 模块。剩余：board 聚合（D）、Reflex 骨架、认证、管理后台等。新开发按目标结构规划。
+> Reflex + SQLite 方案**已采纳**（`docs/DESIGN.md` v4.0）。按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 已完成一期「地基」：打包、建表、JSON 一次性迁移、contest/rating 模块、board 榜单聚合。剩余：Reflex 骨架（一期收官）、认证、管理后台等。新开发按目标结构规划。
 
 ## 常用命令
 
@@ -63,6 +63,7 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 - `xcpc_core/contest/` → 比赛与成绩（Contest/Standing，upsert）
 - `xcpc_core/importer/` → 数据导入（raw + SQLite 双写）
 - `xcpc_core/rating/` → Rating 引擎（计算器 + 事件生成）
+- `xcpc_core/board/` → 榜单聚合（只读，Rating × 选手信息 → BoardSnapshot）
 - `xcpc_core/db/` → SQLite 表、session、一次性迁移
 - `xcpc_core/utils/` → `Plog`（双写日志）、`calendar`（赛年/赛季）
 
@@ -79,7 +80,7 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
         │
         ▼ import（xcpc_core.importer.*，raw 归档 + SQLite 双写）
         ▼ SQLite（data/db/xcpc.db，运行时数据源）
-        ▼ Rating 计算（xcpc_core.rating.*）→ 榜单（xcpc_core.board.*，未实现）
+        ▼ Rating 计算（xcpc_core.rating.*）→ 榜单（xcpc_core.board.*）
 ```
 
 `data/config/` 为配置：`contest_weights.yaml`（正式赛按 `contest_type`、训练赛按 `division` 的权重表）、`school.yaml`（本校 Organization 精确匹配名 + 自动建档默认入学年）。
@@ -113,6 +114,6 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
 ## 文档与实现状态
 
 - `docs/` 是**已采纳设计**：`DESIGN.md` 为架构总览（Reflex + SQLite），`01` 工程结构，`03`–`11` 业务模块设计，`12` 开发流程建议，`13` 实施路线图。
-- **已实现**：SQLite 持久化（`xcpc_core/db/`，表结构见 `10`）、选手/队伍 CRUD、正式赛导入（raw+DB 双写）、contest 模块（`03`）、rating 引擎（`06`，placeholder 公式）。**设计蓝图**：榜单（`07`，未实现）、Reflex 前端（`08`）、认证（`09`）、部署（`11`）。
+- **已实现**：SQLite 持久化（`xcpc_core/db/`，表结构见 `10`）、选手/队伍 CRUD、正式赛导入（raw+DB 双写）、contest 模块（`03`）、rating 引擎（`06`，placeholder 公式）、board 榜单聚合（`07`，含 data_version 缓存）。**设计蓝图**：Reflex 前端（`08`）、认证（`09`）、部署（`11`）。
 - 原 Vue 静态站方案与 Reflex 提案文档已删除（留 Git 历史）。
 - `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流建议见 `docs/12-开发流程建议.md`。
