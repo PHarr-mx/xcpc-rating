@@ -6,14 +6,14 @@
 
 ## 总体状态
 
-一期「地基」已完成；二期「认证」设计中，未开始。
+一期「地基」已完成；二期「认证」进行中（P2a/P2b/P2c 已完成，P2d 开始前）。
 
 ## 分期进度
 
 | 期 | 内容 | 状态 | 备注 |
 |----|------|------|------|
 | 一期 | 地基 | ✅ 已完成 | P0 骨架 + P1 榜单页均完成 |
-| 二期 | 认证 | 🔬 设计中 | P2–P7 拆分见 §二期中详述 |
+| 二期 | 认证 | 🔨 进行中 | P2a/P2b/P2c 完成，P2d 开始前；拆分见 §二期中详述 |
 | 三期 | 管理后台 | ⬜ 未开始 | |
 | 四期 | 业务补齐 | ⬜ 未开始 | |
 | 五期 | 上线 | ⬜ 未开始 | |
@@ -31,10 +31,26 @@
 
 **一期完成标志**：能用真实数据在浏览器看到榜单。✅ 已达成。
 
+## 二期明细（进行中，2026-08-18）
+
+> 认证是 web 层（Reflex SQLModel）职责，`UserProfile`/`BindingRequest` 存在 `xcpc_web.db`，经 `rx.session()` 访问；`xcpc_core` 不 import 这些模型。核心 DB 与 web DB 分离 → `bound_player_id`/`player_id` 无法用跨库外键，改为 service 层校验存在性。
+
+- ✅ 2026-08-18 P2a 表结构：`xcpc_web/states/auth_models.py` 定义 `UserProfile` / `BindingRequest`（SQLModel，FK → `localuser.id`；跨库 player FK 已移除）；`rxconfig.py` 的 `db_url` 指向绝对路径 `data/db/xcpc_web.db`；`pyproject.toml` 追加 `reflex-local-auth>=0.5.0`（顺带 `sqlmodel`、`bcrypt`）
+- ✅ 2026-08-18 P2b AuthState + CLI：`states/auth.py` 的 `AuthState(LocalAuthState)` 提供缓存 computed var `profile` / `is_admin` / `bound_player_id` / `is_bound`；`xcpc_web/create_admin.py` 一键创建首个 admin（同一事务写 `LocalUser` + `UserProfile(role=admin)`），**已实测跑通**（`xcpc_web.db` 四表建齐、admin 入库）
+- ✅ 2026-08-18 P2c `/login` `/register` 页 + 路由接线：`pages/login.py`（绑 `LoginState.on_submit`，错误 callout、注册链接）、`pages/register.py`（绑 `ExtendedRegistrationState.handle_registration`，成功态提示）、`xcpc_web.py` 注册 `/login` `/register` 路由；`reflex run` 编译通过、两路由 200
+- ✅ 2026-08-18 P2c 注册扩展修正：踩坑后改为覆写 `_register_user` + 完整实现 `handle_registration`（reflex 0.9.x 中 `super()` 调用事件处理器是**异步入队**，且继承的 handler 注册在基类路径上、跑在基类实例上 → 读 `self.new_user_id` 拿不到新值）。现 `handle_registration` 在本类定义，`_register_user` 在**同一事务**写 `LocalUser` + `UserProfile(role=member)`，经 Socket.IO 后端 E2E 实测通过（注册成功→`new_user_id`→跳 `/login`；登录 admin→`LocalAuthSession` 建立）
+- 🔨 2026-08-18 P2d `/profile` 自助资料 + 绑定申请（下一 Part）
+- ⬜ P2e admin 权限守卫三落点
+- ⬜ P2f admin 概览 + 绑定审批 UI
+
+**二期完成标志**：未登录访问 `/profile` 重定向 `/login`；普通用户访问 `/admin/*` 被拒；可提交绑定申请；CLI 可建首个 admin（✅ 已验证）。
+
 ## 实测快照（2026-08-18）
 
 - 测试：72 passed
-- DB：24 选手 / 8 队伍 / 1 正式赛（8 standings）；`ratingevent`、`auditlog`、`ojcontest` 等表为空
+- DB（core，`data/db/xcpc.db`）：24 选手 / 8 队伍 / 1 正式赛（8 standings）；`ratingevent`、`auditlog`、`ojcontest` 等表为空
+- DB（web，`data/db/xcpc_web.db`，新增）：`localuser` / `localauthsession` / `userprofile` / `bindingrequest` 四表已建；admin 用户已创建（`localuser.id=1`，`userprofile.role=admin`）
+- P2c E2E 实测（Socket.IO 后端事件）：注册 → `LocalUser` + `UserProfile(role=member)` 同事务写入；登录 → `LocalAuthSession` 建立。测试账号已清理
 - 榜单：`board()` 输出 21 行，`algorithm=placeholder_v0`（数值无业务含义，真公式在四期）
 - `data/raw/training/`、`data/public/` 为空
 
@@ -68,6 +84,8 @@
 ### 3. 具体任务清单
 
 #### P2a · DB 表结构扩展
+
+> ⚠️ 实际实现已偏离本小节：表改为 web 层 SQLModel（`xcpc_web/xcpc_web/states/auth_models.py`），存 `xcpc_web.db`，经 `rx.session()` 访问；未入 `xcpc_core/db/tables.py`。下方代码块为原设计参考。
 
 **文件修改：**
 - `xcpc_core/db/tables.py`：追加 `UserProfile`、`BindingRequest`
@@ -106,8 +124,8 @@ class BindingRequest(Base):
 #### P2b · AuthState + CLI 创建 admin
 
 **新增文件：**
-- `xcpc_web/xcpc_web/states/auth.py`
-- `xcpc_core/auth/cli.py`（新建 core CLI 模块）
+- `xcpc_web/xcpc_web/states/auth.py` ✅（已实现）
+- `xcpc_core/auth/cli.py`（新建 core CLI 模块）→ ⚠️ 实际改为 `xcpc_web/create_admin.py`（web 层 CLI）
 
 **核心逻辑：**
 
@@ -143,6 +161,8 @@ def create_admin():
 - `xcpc_core/auth/__init__.py`：re-export
 
 #### P2c · `/login` / `/register` UI
+
+> ✅ 已完成（见 §二期明细）。实现偏离：未直接复用库 `pages.login_page/register_page`，改为项目自绘 `pages/login.py` / `pages/register.py`（套 `page_shell`，中文文案）；注册扩展用 `_register_user` 覆写 + 本类完整实现 `handle_registration`（reflex 0.9.x `super()` 事件异步入队、继承 handler 注册在基类路径，详见 §二期明细）。
 
 **新增文件：**
 - `xcpc_web/xcpc_web/pages/login.py`
@@ -276,3 +296,6 @@ def pending_bindings(self) -> list[dict]:
 | 2026-08-18 | P0 Reflex 骨架完成（`xcpc_web/`，空壳页可运行，core 桥接通） |
 | 2026-08-18 | P1 榜单只读页完成（BoardState、筛选/排序/搜索、表格渲染）；一期关闭 |
 | 2026-08-18 | P2 认证开发计划出炉，分 6 个子 Part（P2a~P2f） |
+| 2026-08-18 | P2a 完成：`UserProfile`/`BindingRequest` SQLModel 表 + web DB（`xcpc_web.db`）+ `reflex-local-auth` 依赖；跨库 player FK 移除改为 service 层校验 |
+| 2026-08-18 | P2b 完成：`AuthState` + `create_admin.py` CLI，`create_all` 与首个 admin 创建实测通过（`localuser.id=1`） |
+| 2026-08-18 | P2c 完成：`/login` `/register` 页 + 路由；修掉 reflex 事件继承/super 异步坑（改覆写 `_register_user` + 本类实现 `handle_registration`）；注册/登录 Socket.IO E2E 通过 |

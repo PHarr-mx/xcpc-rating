@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 web = [
     "reflex==0.9.7",
+    "reflex-local-auth>=0.5.0",
 ]
 
 [dependency-groups]
