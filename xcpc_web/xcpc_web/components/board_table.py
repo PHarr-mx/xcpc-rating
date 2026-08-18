@@ -39,7 +39,7 @@ def board_table() -> rx.Component:
             rx.text(
                 f'Algorithm: {BoardState.meta["algorithm"]} · Data Version: {BoardState.meta["data_version"]} · Generated: {BoardState.meta["generated_at"]}',
                 size="1",
-                color="gray.600",
+                color=rx.color("gray", 10),
             ),
         ),
         spacing="4",

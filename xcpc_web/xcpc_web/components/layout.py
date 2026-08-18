@@ -1,6 +1,9 @@
 """布局组件。"""
 
 import reflex as rx
+import reflex_local_auth
+
+from ..states.auth import AuthState
 
 
 def page_shell(*children) -> rx.Component:
@@ -10,10 +13,42 @@ def page_shell(*children) -> rx.Component:
         rx.hstack(
             rx.heading("XCPC Rating", size="6"),
             rx.spacer(),
-            rx.text("校内编程竞赛评级系统", size="2"),
+            rx.cond(
+                AuthState.is_authenticated,
+                rx.hstack(
+                    rx.text(AuthState.authenticated_user.username, size="2"),
+                    rx.button(
+                        "登出",
+                        on_click=AuthState.do_logout,
+                        variant="soft",
+                        size="2",
+                    ),
+                    spacing="3",
+                ),
+                rx.hstack(
+                    rx.button(
+                        "登录",
+                        on_click=rx.redirect(
+                            reflex_local_auth.routes.LOGIN_ROUTE
+                        ),
+                        variant="soft",
+                        size="2",
+                    ),
+                    rx.button(
+                        "注册",
+                        on_click=rx.redirect(
+                            reflex_local_auth.routes.REGISTER_ROUTE
+                        ),
+                        variant="solid",
+                        size="2",
+                    ),
+                    spacing="2",
+                ),
+            ),
             padding="1rem 2rem",
-            border_bottom="1px solid #e2e8f0",
-            background="white",
+            border_bottom="1px solid",
+            border_color=rx.color("gray", 6),
+            background=rx.color("gray", 1),
         ),
         # 内容
         rx.container(*children, padding="2rem 0"),
@@ -23,7 +58,8 @@ def page_shell(*children) -> rx.Component:
                 rx.text("© 2026 XCPC Rating System", size="1"),
                 padding="1rem",
             ),
-            border_top="1px solid #e2e8f0",
+            border_top="1px solid",
+            border_color=rx.color("gray", 6),
             margin_top="2rem",
         ),
         min_height="100vh",
