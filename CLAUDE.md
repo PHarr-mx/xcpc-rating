@@ -51,7 +51,20 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 ))
 ```
 
-未实现：`xcpc-data update` / `xcpc-site build|deploy` 尚未编写。
+ 未实现：`xcpc-data update` / `xcpc-site build|deploy` 尚未编写。
+
+## Web 开发
+
+Reflex 骨架已创建（`xcpc_web/`，锁版本 0.9.7），一期收官项为榜单页 `/`（P1）。
+
+开发命令：
+
+```bash
+uv sync --extra web                    # 安装 reflex 及组件分包
+cd xcpc_web && ../.venv/bin/reflex run # 启动开发服务器（端口 3000）
+```
+
+详见 [docs/14-Web开发拆分计划.md](docs/14-Web开发拆分计划.md)。
 
 ## 架构总览
 

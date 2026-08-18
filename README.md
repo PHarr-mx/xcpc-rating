@@ -13,6 +13,7 @@
 | [data/](data/) | 数据文件（raw / config / db） |
 | [docs/](docs/) | 设计文档、模块说明、开发手册 |
 | [skill/](skill/) | AI Agent Skills |
+| [xcpc_web/](xcpc_web/) | Reflex Web 前端（一期地基） |
 
 ## 文档
 
@@ -31,6 +32,7 @@
 | [docs/11-部署与运维.md](docs/11-部署与运维.md) | Caddy / systemd / 备份 |
 | [docs/12-开发流程建议.md](docs/12-开发流程建议.md) | 开发手册：环境、约定、避坑 |
 | [docs/13-实施路线图.md](docs/13-实施路线图.md) | 五期实施计划 |
+| [docs/14-Web开发拆分计划.md](docs/14-Web开发拆分计划.md) | Web 开发拆分与执行指南 |
 | [docs/skills.md](docs/skills.md) | AI Agent Skills |
 
 ## 环境
@@ -72,11 +74,16 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 
 # 运行测试
 uv run python -m pytest xcpc_core -v
+
+# Web 开发
+uv sync --extra web
+cd xcpc_web && ../.venv/bin/reflex run
 ```
 
 ## 实施状态
 
-当前完成：选手/队伍 CRUD、正式赛 xlsx 导入（JSON 数据层）。
+当前完成：选手/队伍 CRUD、正式赛 xlsx 导入（JSON 数据层）。  
+**P0 Reflex 骨架** 已就绪（`xcpc_web/`），榜单页（P1）待开发。
 
 按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 推进五期改造：
 `pyproject 打包 → Reflex 骨架 → 认证 → 管理后台 → Rating 计算 → 上线`。

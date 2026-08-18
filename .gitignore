@@ -4,9 +4,8 @@ data/public/.staging/
 data/db/
 logs/
 
-# 前端
-frontend/node_modules/
-frontend/dist/
+# 前端（Reflex）
+# Reflex 产物由 xcpc_web/.gitignore 覆盖
 
 # Python
 .venv/
