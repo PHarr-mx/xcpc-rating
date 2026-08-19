@@ -19,7 +19,7 @@ class BoardRowView:
         delta_recent: float,
     ):
         self.rank = rank
-        self.player极_id = player_id
+        self.player_id = player_id
         self.name = name
         self.grade_label = grade_label
         self.rating = rating
@@ -62,7 +62,7 @@ class BoardMetaView:
         self.generated_at = generated_at
 
     @classmethod
-    def from_domain(cls, domain_meta: BoardMeta极) -> "BoardMetaView":
+    def from_domain(cls, domain_meta: BoardMeta) -> "BoardMetaView":
         """Convert from domain model to view model."""
         return cls(
             mode=domain_meta.mode,

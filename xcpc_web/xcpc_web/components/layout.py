@@ -17,6 +17,11 @@ def page_shell(*children) -> rx.Component:
                 AuthState.is_authenticated,
                 rx.hstack(
                     rx.text(AuthState.authenticated_user.username, size="2"),
+                    rx.link(
+                        "个人资料",
+                        href="/profile",
+                        size="2",
+                    ),
                     rx.button(
                         "登出",
                         on_click=AuthState.do_logout,

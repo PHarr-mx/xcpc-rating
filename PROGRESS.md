@@ -6,14 +6,14 @@
 
 ## 总体状态
 
-一期「地基」已完成；二期「认证」进行中（P2a/P2b/P2c 已完成，P2d 开始前）。
+一期「地基」已完成；二期「认证」进行中（P2a–P2d 已完成，P2e 开始前）。
 
 ## 分期进度
 
 | 期 | 内容 | 状态 | 备注 |
 |----|------|------|------|
 | 一期 | 地基 | ✅ 已完成 | P0 骨架 + P1 榜单页均完成 |
-| 二期 | 认证 | 🔨 进行中 | P2a/P2b/P2c 完成，P2d 开始前；拆分见 §二期中详述 |
+| 二期 | 认证 | 🔨 进行中 | P2a–P2d 完成，P2e 开始前；拆分见 §二期中详述 |
 | 三期 | 管理后台 | ⬜ 未开始 | |
 | 四期 | 业务补齐 | ⬜ 未开始 | |
 | 五期 | 上线 | ⬜ 未开始 | |
@@ -39,18 +39,19 @@
 - ✅ 2026-08-18 P2b AuthState + CLI：`states/auth.py` 的 `AuthState(LocalAuthState)` 提供缓存 computed var `profile` / `is_admin` / `bound_player_id` / `is_bound`；`xcpc_web/create_admin.py` 一键创建首个 admin（同一事务写 `LocalUser` + `UserProfile(role=admin)`），**已实测跑通**（`xcpc_web.db` 四表建齐、admin 入库）
 - ✅ 2026-08-18 P2c `/login` `/register` 页 + 路由接线：`pages/login.py`（绑 `LoginState.on_submit`，错误 callout、注册链接）、`pages/register.py`（绑 `ExtendedRegistrationState.handle_registration`，成功态提示）、`xcpc_web.py` 注册 `/login` `/register` 路由；`reflex run` 编译通过、两路由 200
 - ✅ 2026-08-18 P2c 注册扩展修正：踩坑后改为覆写 `_register_user` + 完整实现 `handle_registration`（reflex 0.9.x 中 `super()` 调用事件处理器是**异步入队**，且继承的 handler 注册在基类路径上、跑在基类实例上 → 读 `self.new_user_id` 拿不到新值）。现 `handle_registration` 在本类定义，`_register_user` 在**同一事务**写 `LocalUser` + `UserProfile(role=member)`，经 Socket.IO 后端 E2E 实测通过（注册成功→`new_user_id`→跳 `/login`；登录 admin→`LocalAuthSession` 建立）
-- 🔨 2026-08-18 P2d `/profile` 自助资料 + 绑定申请（下一 Part）
+- ✅ 2026-08-20 P2d `/profile` 自助资料 + 绑定申请：`ProfileState`（绑定申请/自助字段/OJ 账号管理）+ `/profile` 页 + 路由接线；顶栏加「个人资料」入口（详见 §P2d 实现说明）
 - ⬜ P2e admin 权限守卫三落点
 - ⬜ P2f admin 概览 + 绑定审批 UI
 
-**二期完成标志**：未登录访问 `/profile` 重定向 `/login`；普通用户访问 `/admin/*` 被拒；可提交绑定申请；CLI 可建首个 admin（✅ 已验证）。
+**二期完成标志**：未登录访问 `/profile` 重定向 `/login`（✅ P2d 已做，on_load 重定向）；普通用户访问 `/admin/*` 被拒（P2e）；可提交绑定申请（✅ P2d 已做）；CLI 可建首个 admin（✅ 已验证）。
 
-## 实测快照（2026-08-18）
+## 实测快照（2026-08-20）
 
-- 测试：72 passed
+- 测试：72 passed（core pytest，无回归）
 - DB（core，`data/db/xcpc.db`）：24 选手 / 8 队伍 / 1 正式赛（8 standings）；`ratingevent`、`auditlog`、`ojcontest` 等表为空
-- DB（web，`data/db/xcpc_web.db`，新增）：`localuser` / `localauthsession` / `userprofile` / `bindingrequest` 四表已建；admin 用户已创建（`localuser.id=1`，`userprofile.role=admin`）
+- DB（web，`data/db/xcpc_web.db`）：`localuser` / `localauthsession` / `userprofile` / `bindingrequest` 四表已建；admin 用户已创建（`localuser.id=1`，`userprofile.role=admin`）
 - P2c E2E 实测（Socket.IO 后端事件）：注册 → `LocalUser` + `UserProfile(role=member)` 同事务写入；登录 → `LocalAuthSession` 建立。测试账号已清理
+- P2d 验证（临时 venv，reflex 0.9.7 / Python 3.14）：app 组件树构造通过、四路由注册、`reflex run --backend-only` 页面 evaluate 无错误、`/ping` 返回 pong。**完整前端编译 / 浏览器 E2E 未在本环境完成**（缺 `socksio` 依赖与前端构建环境），需在正常开发环境 `reflex run` 实测
 - 榜单：`board()` 输出 21 行，`algorithm=placeholder_v0`（数值无业务含义，真公式在四期）
 - `data/raw/training/`、`data/public/` 为空
 
@@ -177,11 +178,20 @@ def create_admin():
 
 #### P2d · `/profile` 自助资料 + 绑定申请
 
+> ✅ 已完成（2026-08-20）。**实现偏离**：未新建 `xcpc_core/auth/`。理由：`BindingRequest`/`UserProfile` 存 web DB（`xcpc_web.db`），`xcpc_core` 不 import auth 模型，跨库无法在 core 层读写绑定表。绑定申请/审批逻辑全部实现于 web 层 `states/profile.py`（经 `rx.session()`），选手存在性校验与自助字段更新经 `xcpc_core.player.api`（合规路径）。
+
 **新增/修改文件：**
-- `xcpc_web/xcpc_web/states/profile.py`
-- `xcpc_web/xcpc_web/pages/profile.py`
-- `xcpc_core/auth/service.py`（新建）：绑定申请/审批逻辑
-- `xcpc_core/auth/views.py`（新建）：视图模型
+- `xcpc_web/xcpc_web/states/profile.py` ✅（ProfileState：绑定申请、自助字段编辑、OJ 账号管理）
+- `xcpc_web/xcpc_web/pages/profile.py` ✅（/profile 页：绑定表单/绑定信息/自助编辑）
+- `xcpc_web/xcpc_web/xcpc_web.py` ✅（注册 `/profile` 路由 + `on_load=ProfileState.on_load`）
+- `xcpc_web/xcpc_web/components/layout.py` ✅（顶栏登录后加「个人资料」链接）
+- `xcpc_web/xcpc_web/states/views.py` ✅（顺手修复乱码标识符 `player极_id`/`BoardMeta极`，死代码无人使用）
+
+**reflex 0.9.7 踩坑（均已修复）：**
+- foreach 的 lambda 里不能 Python `+` 拼字符串（item 是 `ObjectItemOperation`）→ 用 f-string（经 `Var.__format__`，reflex 官方机制；`rx.concat` 不存在）
+- `state_auto_setters` 默认 **False**（该机制已弃用）→ `set_xxx` 需显式定义
+- foreach 对无类型注解的 dict 字段（`player["oj_accounts"]`）报 `ForeachVarError` → `oj_accounts` 提为独立强类型 computed var（`list[dict]`）
+- 低层 Select API：`rx.select.root(trigger, content, value, on_change)` + `rx.select.item(label, value=...)` 实现 label/value 分离（高层 `items` 只接受 `Sequence[str]`，值即选项，无法分离）
 
 **功能点：**
 - 展示当前绑定的 `player_id`（或「未绑定」状态）
@@ -299,3 +309,4 @@ def pending_bindings(self) -> list[dict]:
 | 2026-08-18 | P2a 完成：`UserProfile`/`BindingRequest` SQLModel 表 + web DB（`xcpc_web.db`）+ `reflex-local-auth` 依赖；跨库 player FK 移除改为 service 层校验 |
 | 2026-08-18 | P2b 完成：`AuthState` + `create_admin.py` CLI，`create_all` 与首个 admin 创建实测通过（`localuser.id=1`） |
 | 2026-08-18 | P2c 完成：`/login` `/register` 页 + 路由；修掉 reflex 事件继承/super 异步坑（改覆写 `_register_user` + 本类实现 `handle_registration`）；注册/登录 Socket.IO E2E 通过 |
+| 2026-08-20 | P2d 完成：`/profile` 自助资料 + 绑定申请（`ProfileState` + 页面 + 路由 + 顶栏入口）；无 core/auth（web 层实现）；修 reflex 0.9.7 三坑（f-string 拼接/显式 setter/强类型 var）+ `views.py` 乱码 |
