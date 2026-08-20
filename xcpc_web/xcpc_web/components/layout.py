@@ -22,6 +22,10 @@ def page_shell(*children) -> rx.Component:
                         href="/profile",
                         size="2",
                     ),
+                    rx.cond(
+                        AuthState.is_admin,
+                        rx.link("后台管理", href="/admin", size="2"),
+                    ),
                     rx.button(
                         "登出",
                         on_click=AuthState.do_logout,

@@ -82,6 +82,9 @@ def core_store():
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
+    from xcpc_core.audit import api as audit_api
+
+    audit_api.configure_session(None)  # type: ignore[arg-type]
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()
