@@ -94,7 +94,10 @@ class PlayerService:
             raise PlayerNotFoundError(player_id)
 
         updated = current.model_copy(
-            update={key: value for key, value in data.model_dump(exclude_unset=True).items()}
+            # model_dump 会把嵌套 DTO（OJAccount）序列化成 dict，而
+            # model_copy 不做校验转换，store 层会拿到 dict 而非对象。
+            # 用 model_fields_set + getattr 保留原始对象类型。
+            update={key: getattr(data, key) for key in data.model_fields_set}
         )
         updated.updated_at = today
         try:

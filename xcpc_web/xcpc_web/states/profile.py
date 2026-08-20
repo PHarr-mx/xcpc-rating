@@ -63,9 +63,14 @@ class ProfileState(AuthState):
 
     # ---- 展示用 computed var ----
 
-    @rx.var(cache=True)
+    @rx.var(cache=False)
     def player(self) -> dict | None:
-        """当前绑定选手的 core 侧数据（含自助字段与 admin-only 字段）。"""
+        """当前绑定选手的 core 侧数据（含自助字段与 admin-only 字段）。
+
+        cache=False：本会话内自助编辑会改 core 数据，若缓存则第二次
+        操作读到旧快照（同会话连加两个 OJ 账号会覆盖第一个）。代价是
+        每次访问多一次 DB 查询，校内工具量级可接受。
+        """
         pid = self.bound_player_id
         if not pid:
             return None
@@ -84,15 +89,21 @@ class ProfileState(AuthState):
             "oj_accounts": [a.model_dump() for a in p.oj_accounts],
         }
 
-    @rx.var(cache=True)
+    @rx.var(cache=False)
     def oj_accounts(self) -> list[dict]:
-        """当前绑定选手的 OJ 账号列表（强类型，供 foreach）。"""
+        """当前绑定选手的 OJ 账号列表（强类型，供 foreach）。
+
+        cache=False：跟随 player 的最新值（添加/删除后页面列表即时刷新）。
+        """
         data = self.player or {}
         return data.get("oj_accounts", [])
 
-    @rx.var(cache=True)
+    @rx.var(cache=False)
     def bindable_players(self) -> list[dict]:
-        """可选绑定的选手：排除离队、已绑定、以及本人已申请过的。"""
+        """可选绑定的选手：排除离队、已绑定、以及本人已申请过的。
+
+        cache=False：提交申请后该选手应立即从可选列表移除。
+        """
         if self.bound_player_id:
             return []
         claimed: set[str] = set()

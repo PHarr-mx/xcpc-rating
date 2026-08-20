@@ -43,6 +43,26 @@ def test_update_player(service):
     assert updated.updated_at == date(2026, 6, 29)
 
 
+def test_update_player_oj_accounts(service):
+    """oj_accounts 更新：嵌套 DTO 不能退化成 dict（model_dump+model_copy 坑）。"""
+    created = service.create_player(
+        PlayerCreate(name="oj 更新", grade=2023), today=date(2026, 1, 1)
+    )
+    updated = service.update_player(
+        created.id,
+        PlayerUpdate(oj_accounts=[OJAccount(platform="codeforces", handle="cf_1")]),
+        today=date(2026, 6, 29),
+    )
+    assert [(a.platform, a.handle) for a in updated.oj_accounts] == [
+        ("codeforces", "cf_1")
+    ]
+    # 从库里读回也一致（覆盖 store._write_nested 往返）
+    fetched = service.get_player(created.id)
+    assert [(a.platform, a.handle) for a in fetched.oj_accounts] == [
+        ("codeforces", "cf_1")
+    ]
+
+
 def test_delete_player(service):
     created = service.create_player(PlayerCreate(name="待删", grade=2023), today=date(2026, 1, 1))
     removed = service.delete_player(created.id, today=date(2026, 6, 29))

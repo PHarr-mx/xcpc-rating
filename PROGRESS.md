@@ -1,12 +1,12 @@
 # 开发进度
 
-> 最近更新：2026-08-18 · 对照 [docs/13-实施路线图.md](docs/13-实施路线图.md)
+> 最近更新：2026-08-20 · 对照 [docs/13-实施路线图.md](docs/13-实施路线图.md)
 >
 > 记录原则：只记「结论 + 日期」，设计细节留在 `docs/`，变更细节看 git log。
 
 ## 总体状态
 
-一期「地基」已完成；二期「认证」进行中（P2a–P2d 已完成，P2e 开始前）。
+二期「认证」进行中（P2a–P2d 已完成，P2e 待做；测试基建就绪）。
 
 ## 分期进度
 
@@ -40,6 +40,7 @@
 - ✅ 2026-08-18 P2c `/login` `/register` 页 + 路由接线：`pages/login.py`（绑 `LoginState.on_submit`，错误 callout、注册链接）、`pages/register.py`（绑 `ExtendedRegistrationState.handle_registration`，成功态提示）、`xcpc_web.py` 注册 `/login` `/register` 路由；`reflex run` 编译通过、两路由 200
 - ✅ 2026-08-18 P2c 注册扩展修正：踩坑后改为覆写 `_register_user` + 完整实现 `handle_registration`（reflex 0.9.x 中 `super()` 调用事件处理器是**异步入队**，且继承的 handler 注册在基类路径上、跑在基类实例上 → 读 `self.new_user_id` 拿不到新值）。现 `handle_registration` 在本类定义，`_register_user` 在**同一事务**写 `LocalUser` + `UserProfile(role=member)`，经 Socket.IO 后端 E2E 实测通过（注册成功→`new_user_id`→跳 `/login`；登录 admin→`LocalAuthSession` 建立）
 - ✅ 2026-08-20 P2d `/profile` 自助资料 + 绑定申请：`ProfileState`（绑定申请/自助字段/OJ 账号管理）+ `/profile` 页 + 路由接线；顶栏加「个人资料」入口（详见 §P2d 实现说明）
+- ✅ 2026-08-20 测试基建 + 双 bug 修复：`xcpc_web/tests/`（conftest 状态链构造 + 21 条回归）；修 core `update_player` oj_accounts dict 退化 bug、P2d computed var 缓存永不失效 bug（player/oj_accounts/bindable_players 改 `cache=False`）
 - ⬜ P2e admin 权限守卫三落点
 - ⬜ P2f admin 概览 + 绑定审批 UI
 
@@ -47,7 +48,7 @@
 
 ## 实测快照（2026-08-20）
 
-- 测试：72 passed（core pytest，无回归）
+- 测试：core 73 passed；web `xcpc_web/tests/` 21 passed（2026-08-20 新增，含 P2d 全规则回归）
 - DB（core，`data/db/xcpc.db`）：24 选手 / 8 队伍 / 1 正式赛（8 standings）；`ratingevent`、`auditlog`、`ojcontest` 等表为空
 - DB（web，`data/db/xcpc_web.db`）：`localuser` / `localauthsession` / `userprofile` / `bindingrequest` 四表已建；admin 用户已创建（`localuser.id=1`，`userprofile.role=admin`）
 - P2c E2E 实测（Socket.IO 后端事件）：注册 → `LocalUser` + `UserProfile(role=member)` 同事务写入；登录 → `LocalAuthSession` 建立。测试账号已清理
@@ -310,3 +311,4 @@ def pending_bindings(self) -> list[dict]:
 | 2026-08-18 | P2b 完成：`AuthState` + `create_admin.py` CLI，`create_all` 与首个 admin 创建实测通过（`localuser.id=1`） |
 | 2026-08-18 | P2c 完成：`/login` `/register` 页 + 路由；修掉 reflex 事件继承/super 异步坑（改覆写 `_register_user` + 本类实现 `handle_registration`）；注册/登录 Socket.IO E2E 通过 |
 | 2026-08-20 | P2d 完成：`/profile` 自助资料 + 绑定申请（`ProfileState` + 页面 + 路由 + 顶栏入口）；无 core/auth（web 层实现）；修 reflex 0.9.7 三坑（f-string 拼接/显式 setter/强类型 var）+ `views.py` 乱码 |
+| 2026-08-20 | P2a–P2d 实测验证（临时 DB 隔离 + 真实状态链，非文档背书）：注册/登录/绑定/权限 var 链全通。新增 `xcpc_web/tests/` 测试基建（21 条）；修 core `update_player` oj_accounts dict 退化 + P2d computed var 缓存永不失效（`cache=False`）；core 73 + web 21 全绿 |
