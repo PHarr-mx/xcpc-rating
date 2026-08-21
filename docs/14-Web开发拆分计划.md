@@ -21,13 +21,12 @@
 | **P1** ✅ | 榜单只读页 `/` | 一期（收官） | P0 | 浏览器看到真实数据榜单，筛选/搜索/排序可用 |
 | **P2** ✅ | 认证底座：登录注册 + AuthState + 权限守卫 | 二期 | P1 | 未登录访问 `/profile` 被重定向 |
 | **P3** ✅ | `/profile` 自助资料 + 绑定申请 | 二期 | P2 | 用户可提交绑定申请，admin 可审批 |
-| **P4** | 后台 CRUD：players / teams / contests / audit | 三期 | P2 | admin 在 Web 完成全部增删改查 |
-| **P5** | 在线导入 `/admin/import` | 三期 | P4 | 不再需要敲 CLI 导入 |
-| **P6** | 详情页与图表：`/players/{id}` `/contests/{id}` `/about` | 一期后即可插入 | P1 | 详情页渲染真实记录，Rating 曲线可见 |
-| **P7** | 权重试算 `/admin/rating` | 四期 | P4 | 试算 diff 可见，应用后榜单变化 |
+| **P4a–P4d** | 三期后台 CRUD ×4：选手 / 队伍 / 比赛与审计 / 在线导入 | 三期 | P2 | Web 端完成全部增删改查 + 导入 |
+| **P5** | 详情页与图表：`/players/{id}` `/contests/{id}` `/about` | 一期后即可插入 | P1 | 详情页渲染真实记录，Rating 曲线可见 |
+| **P6** | 权重试算 `/admin/rating` | 四期 | P4c | 试算 diff 可见，应用后榜单变化 |
 
-顺序约束：**P0→P1 最先；P2→P3 必须先于 P4/P5**（否则会先做出一批无认证的写接口，[13](./13-实施路线图.md) §2）。
-P6 是纯只读页，不依赖认证，建议紧跟 P1 做掉（一期/二期间隙），也可推迟。
+顺序约束：**P0→P1 最先；P2→P3 必须先于三期 CRUD**（否则会先做出一批无认证的写接口，[13](./13-实施路线图.md) §2）。
+P5 是纯只读页，不依赖认证，建议紧跟 P1 做掉（一期/二期间隙），也可推迟。
 
 ## 3. 目标包结构
 
@@ -42,7 +41,7 @@ xcpc_web/
 │   │   ├── player_detail.py # PlayerDetailState（P6）
 │   │   ├── contest_detail.py# ContestDetailState（P6）
 │   │   ├── profile.py       # ProfileState（P3）
-│   │   └── admin/           # AdminPlayer/Team/Contest/User/Import/RatingLab（P4/P5/P7）
+│   │   └── admin/           # AdminPlayer/Team/Contest/Import/RatingLab（P4a–P4d/P6）
 │   ├── pages/               # 一个路由一个文件，与 08 §3 路由表一一对应
 │   ├── components/          # layout / board_table / period_selector / rating_chart 等（08 §5）
 │   └── config.py            # API 端口、OJ 外链模板等
@@ -104,21 +103,41 @@ admin-only 字段只读展示并注明原因。
 
 **坑**：reflex 0.9.7 computed var `cache=True` 无 interval = 永不失效 → 自助字段 / OJ 账号 / 列表类 var 一律 `cache=False`，否则同会话二次操作读到旧快照（连加 OJ 账号会覆盖前一个）。
 
-### P4 · 后台 CRUD 页
+### P4a · `/admin/players` 选手 CRUD
 
-任务：`/admin/players` `/admin/teams` `/admin/contests` `/admin/audit`（[08](08-前端与Web交互模块.md) §4.6）。
-全部走 `player.api` / `team.api` / `contest.api`，唯一性冲突把异常消息直接展示到字段级错误（[08](08-前端与Web交互模块.md) §6）。
-（`/admin` 概览 + `/admin/users` 绑定审批已在二期完成，本 Part 只补业务 CRUD 与审计查看。）
+任务：
 
-验收：admin 全程不敲 CLI 完成选手/队伍增删改查与绑定审批。
+- `AdminPlayersState(AdminState)`：`players` 列表（含 `status`/`grade` 筛选）、弹窗表单（`rx.dialog`）建/改选手
+- 批量操作：`mark_left` 软删（`delete_player` 物理删留 CLI，Web 端主要用软删）
+- 字段：`PlayerCreate`/`PlayerUpdate`（用 core 的 Pydantic 校验）；`PlayerValidationError` 消息直接展示到字段（08 §6）
+- 写操作首行 `_require_admin()`，审计 `audit_api.record(action="player.create|update|mark_left", ...)`
 
-### P5 · 在线导入
+验收：admin 浏览器完成选手新增/改资料/软删，唯一性冲突（如 OJ 账号已绑他人）字段级显示。
 
-任务：`/admin/import` 五步流程（上传 → 元信息 → 预览 → 未匹配决策 → 确认写入），解析结果先落 `ImportBatch(status=staged)`，长解析用 `@rx.event(background=True)` 且不进写事务（[08](08-前端与Web交互模块.md) §4.4、[12](12-开发流程建议.md) §8）。
+### P4b · `/admin/teams` 队伍 CRUD
+
+任务：队伍列表、按队员集合建队（`TeamCreate(members=...)`）、`member_key` 冲突时提示已存在的队、改队员/别名（`aliases`）。用 core `team.api` 的 `find_by_members` 做冲突预检。
+
+验收：admin 浏览器完成队伍建改删，同队员集合建重队被提示。
+
+### P4c · `/admin/contests` + `/admin/audit`
+
+任务：
+
+- `/admin/contests`：比赛列表（按 `source_type` 切 formal/training）+ 删除（core `contest.api.delete_contest` 已级联删 standings/rating_event）
+- `/admin/audit`：审计日志列表，按 `user_id`/`action`/时间筛选；只读（写仅由各业务操作触发）
+
+验收：删除比赛后榜单与成绩消失；审计可按 user/action 筛出绑定审批与 CRUD 记录。
+
+### P4d · `/admin/import` 在线导入五步
+
+任务：上传 → 填元信息（`contest_id`/日期/`contest_type`）→ 解析预览（队数/本校/奖牌线）→ 未匹配项人工决策（新建选手 or 指定现存）→ 确认写入。解析结果先落 `ImportBatch(status=staged)`，确认才写正式表；长解析 `@rx.event(background=True)` 不进写事务（[08](./08-前端与Web交互模块.md) §4.4、[12](./12-开发流程建议.md) §8）。写 `import.confirm` 审计。
+
+**前置**：core 导入目前是 `import_formal_xcpcio_xlsx` 一体化函数（无 staged 流程），P4d 需先把 importer 拆出「parse → 决议 → 写入」两段（增量 core 改动，复用现有 `importer/` 模块）。
 
 验收：用真实省赛 xlsx 走通全流程；中途关页面无半截数据。**此 Part 完成即三期关闭。**
 
-### P6 · 详情页与图表
+### P5 · 详情页与图表
 
 任务：`/players/{player_id}`（信息 + 参赛记录 Tab + Plotly Rating 曲线）、`/contests/{contest_id}`（formal/training 同页按 format 切列）、`/about`（[08](08-前端与Web交互模块.md) §4.2）。
 依赖 `reflex-components-plotly`；曲线超 500 点按赛年聚合（[08](08-前端与Web交互模块.md) §7）。
@@ -126,7 +145,7 @@ admin-only 字段只读展示并注明原因。
 
 验收：点榜单行的选手名进入详情页，记录与曲线与 DB 数据一致。
 
-### P7 · 权重试算
+### P6 · 权重试算
 
 任务：`/admin/rating` 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump `data_version` + 记审计（[08](08-前端与Web交互模块.md) §4.5）。
 前置：四期 Rating 计算器已实现，试算才有业务含义。
@@ -149,4 +168,4 @@ admin-only 字段只读展示并注明原因。
 
 ---
 
-*文档版本：v1.1 — P0/P1 已完成，一期关闭，进入 P2 认证底座开发。*
+*文档版本：v1.3 — 二期已完成（2026-08-20），三期 P4a–P4d 已规划（2026-08-21）。*

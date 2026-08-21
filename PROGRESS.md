@@ -14,7 +14,7 @@
 |----|------|------|------|
 | 一期 | 地基 | ✅ 已完成 | P0 骨架 + P1 榜单页均完成 |
 | 二期 | 认证 | ✅ 已完成 | P2a–P2f 全部完成，2026-08-20 关闭；拆分见 §二期中详述 |
-| 三期 | 管理后台 | ⬜ 未开始 | |
+| 三期 | 管理后台 | 🔨 已规划 | P4a–P4d 拆分见 §三期计划 |
 | 四期 | 业务补齐 | ⬜ 未开始 | |
 | 五期 | 上线 | ⬜ 未开始 | |
 
@@ -291,6 +291,42 @@ def pending_bindings(self) -> list[dict]:
 
 ---
 
+## 三期 · 管理后台 — 开发计划
+
+> 关联：[14-Web开发拆分计划](./docs/14-Web开发拆分计划.md) · [08-前端与Web交互模块](./docs/08-前端与Web交互模块.md) · [13-实施路线图](./docs/13-实施路线图.md)
+
+### 1. 目标
+
+让 admin 在 Web 端完成选手/队伍/比赛的增删改查，以及 xlsx 在线导入，全程不再敲 CLI。
+二期已铺好底座：`states/admin/base.py` 的 `AdminState._require_admin()` 三层守卫、`admin/` 状态器包结构、`audit_api.record()` 审计写入、`xcpc_web/tests/` 测试基建。
+
+**完成标志**：admin 全程不敲 CLI 完成选手/队伍增删改查与绑定审批；在线导入走通五步流程。
+
+### 2. Part 拆解
+
+| Part | 内容 | 依赖 | 预计工作量 | 验收要点 |
+|------|------|------|-----------|---------|
+| **P4a** | `/admin/players` 选手 CRUD | P2e（守卫） | 1d | 列表搜筛选、弹窗表单建/改、`mark_left` 软删；`PlayerValidationError` 字段级展示 |
+| **P4b** | `/admin/teams` 队伍 CRUD | P4a | 0.5d | 队员集合建队、`member_key` 冲突提示、改队员/别名 |
+| **P4c** | `/admin/contests` 比赛管理 + `/admin/audit` 审计页 | P4a | 0.5d | 列表按 source 切、删除级联 standings/rating_event、审计按 user/action 筛 |
+| **P4d** | `/admin/import` 在线导入五步 | P4a | 1d | 上传→元信息→预览→未匹配决策→确认写入；`ImportBatch` staged→confirmed；中途关页面无半截数据 |
+
+**顺序约束**：P4a→P4b→P4c 递增，P4d 理论上依赖 P4a（共享 admin 表单/列表组件），可先做 P4a 建立模式后并行。
+
+**此 Part 完成即三期关闭。**
+
+### 3. 具体任务要点
+
+- 全部走 `player.api` / `team.api` / `contest.api` / `xcpc_core.importer`，不绕过 API 直接写 DB
+- 写操作首行 `guard = self._require_admin()`（第 2 层守卫，已由 `AdminState` 提供）
+- 列表类 computed var 一律 `cache=False`（二期坑：cache=True 永不失效）
+- 审计写入：选手/队伍/比赛每次写操作记 `audit_api.record(action=..., target=..., ...)`，action 用 `player.update|create|delete`、`team.*`、`contest.*`、`import.confirm` 等
+- 唯一性冲突：core 抛出的 `PlayerValidationError` / `TeamValidationError` 消息直接展示（08 §6）
+- 在线导入：解析结果先落 `ImportBatch(status=staged)`，确认才写正式表；长解析用 `@rx.event(background=True)` 且不进写事务（08 §4.4、12 §8）
+- 每 Part 补测试：复用 `build_state`/`make_user`/`core_store` 管线
+
+---
+
 ## 开放问题（同步自路线图 §5）
 
 - `data/public/` 只读导出是否有外部消费者 —— 待确认，无则砍掉
@@ -312,3 +348,4 @@ def pending_bindings(self) -> list[dict]:
 | 2026-08-20 | P2d 完成：`/profile` 自助资料 + 绑定申请（`ProfileState` + 页面 + 路由 + 顶栏入口）；无 core/auth（web 层实现）；修 reflex 0.9.7 三坑（f-string 拼接/显式 setter/强类型 var）+ `views.py` 乱码 |
 | 2026-08-20 | P2a–P2d 实测验证（临时 DB 隔离 + 真实状态链，非文档背书）：注册/登录/绑定/权限 var 链全通。新增 `xcpc_web/tests/` 测试基建（21 条）；修 core `update_player` oj_accounts dict 退化 + P2d computed var 缓存永不失效（`cache=False`）；core 73 + web 21 全绿 |
 | 2026-08-20 | P2e+P2f 完成（二期关闭）：三层守卫 + `/admin` 概览 + `/admin/users` 审批（批准/驳回/unique 预检/自动驳回其余 pending）+ 新 `xcpc_core/audit/api.py`（AuditLog 写入）+ 顶栏后台入口；web 测试 21→39；core 73 + web 39 全绿 |
+| 2026-08-21 | 三期规划入文档：P4a（选手 CRUD）/P4b（队伍 CRUD）/P4c（比赛+审计）/P4d（在线导入），三个 doc 同步更新 |
