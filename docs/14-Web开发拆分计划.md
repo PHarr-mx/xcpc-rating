@@ -19,9 +19,9 @@
 |------|------|--------|------|------|
 | **P0** ✅ | 工程地基：装依赖、`reflex init`、包骨架、dev 脚本 | 一期 | 无 | `reflex run` 起空壳页，能 import `xcpc_core` |
 | **P1** ✅ | 榜单只读页 `/` | 一期（收官） | P0 | 浏览器看到真实数据榜单，筛选/搜索/排序可用 |
-| **P2** | 认证底座：登录注册 + AuthState + 权限守卫 | 二期 | P1 | 未登录访问 `/profile` 被重定向 |
-| **P3** | `/profile` 自助资料 + 绑定申请 | 二期 | P2 | 用户可提交绑定申请 |
-| **P4** | 后台 CRUD：players / teams / contests / users / audit | 三期 | P2 | admin 在 Web 完成全部增删改查 |
+| **P2** ✅ | 认证底座：登录注册 + AuthState + 权限守卫 | 二期 | P1 | 未登录访问 `/profile` 被重定向 |
+| **P3** ✅ | `/profile` 自助资料 + 绑定申请 | 二期 | P2 | 用户可提交绑定申请，admin 可审批 |
+| **P4** | 后台 CRUD：players / teams / contests / audit | 三期 | P2 | admin 在 Web 完成全部增删改查 |
 | **P5** | 在线导入 `/admin/import` | 三期 | P4 | 不再需要敲 CLI 导入 |
 | **P6** | 详情页与图表：`/players/{id}` `/contests/{id}` `/about` | 一期后即可插入 | P1 | 详情页渲染真实记录，Rating 曲线可见 |
 | **P7** | 权重试算 `/admin/rating` | 四期 | P4 | 试算 diff 可见，应用后榜单变化 |
@@ -83,29 +83,32 @@ xcpc_web/
 验收：浏览器看到 21 行真实榜单；切换 mode/周期/搜索均实时生效；刷新带参 URL 状态保持（URL 同步待完善）。
 **此 Part 完成即一期关闭**（更新 [13](./13-实施路线图.md) 与根 PROGRESS.md）。
 
-### P2 · 认证底座
+### P2 · 认证底座 ✅（2026-08-20）
 
 任务：
 
-1. `uv sync --extra web` 后补装 `reflex-local-auth`（加进 `[web]` extra）
-2. DB 补表：`UserProfile` / `BindingRequest`（[09](./09-认证与权限模块.md) §5；schema 变更走 `create_all` 或首个 alembic 迁移）
-3. `states/auth.py`：`AuthState(LocalAuthState)` + `is_admin` / `bound_player_id` computed var
-4. `/login` `/register` 页；注册同事务补写 `UserProfile`（[12](./12-开发流程建议.md) §5 二期坑）
-5. 权限三落点：路由 `on_load` 守卫 / 事件处理器 `require_login` + 角色判断 / 私有数据 computed var（[09](09-认证与权限模块.md) §3/§4）
+1. ✅ 补装 `reflex-local-auth==0.5.0`（已加进 `[web]` extra，连带 `sqlmodel`/`bcrypt`）
+2. ✅ DB 补表：`UserProfile` / `BindingRequest` 以 web 层 SQLModel 定义（`states/auth_models.py`），存 `xcpc_web.db`，经 `create_all` 建表（[09](./09-认证与权限模块.md) §5；跨库 player FK 移除，改 service 层校验）
+3. ✅ `states/auth.py`：`AuthState(LocalAuthState)` + `is_admin` / `bound_player_id` / `is_bound` computed var
+4. ✅ `/login` `/register` 页；注册同事务补写 `UserProfile`（覆写 `_register_user`，[12](./12-开发流程建议.md) §5 二期坑）
+5. ✅ 权限三落点：路由 `on_load` 守卫 / 事件处理器 `_require_admin` / 私有数据 computed var（`states/admin/base.py` 提供 `_require_admin`，[09](09-认证与权限模块.md) §3/§4）
 
-验收：未登录访问 `/profile` 重定向到 `/login`；普通用户访问 `/admin/*` 被拒；预渲染不泄露私有数据。
+验收：未登录访问 `/profile` 重定向到 `/login`；普通用户访问 `/admin/*` 被拒；预渲染不泄露私有数据。✅
 
-### P3 · `/profile` 自助资料
+### P3 · `/profile` 自助资料 ✅（2026-08-20）
 
 任务：校内简称 / 曾用名维护，OJ 账号增删，绑定选手申请表单 + 待审批状态展示（[08](08-前端与Web交互模块.md) §4.3）。
 admin-only 字段只读展示并注明原因。
 
-验收：走通「注册 → 提交绑定 → 管理员批准 → 页面显示已绑定」全链路（批准动作暂用 DB/脚本模拟亦可，正式 UI 在 P4）。
+验收：走通「注册 → 提交绑定 → 管理员批准 → 页面显示已绑定」全链路。✅（审批正式 UI 已在二期完成，见 `states/admin/users.py`）
+
+**坑**：reflex 0.9.7 computed var `cache=True` 无 interval = 永不失效 → 自助字段 / OJ 账号 / 列表类 var 一律 `cache=False`，否则同会话二次操作读到旧快照（连加 OJ 账号会覆盖前一个）。
 
 ### P4 · 后台 CRUD 页
 
-任务：`/admin`（概览 + 待审批）、`/admin/players` `/admin/teams` `/admin/contests` `/admin/users` `/admin/audit`（[08](08-前端与Web交互模块.md) §4.6）。
+任务：`/admin/players` `/admin/teams` `/admin/contests` `/admin/audit`（[08](08-前端与Web交互模块.md) §4.6）。
 全部走 `player.api` / `team.api` / `contest.api`，唯一性冲突把异常消息直接展示到字段级错误（[08](08-前端与Web交互模块.md) §6）。
+（`/admin` 概览 + `/admin/users` 绑定审批已在二期完成，本 Part 只补业务 CRUD 与审计查看。）
 
 验收：admin 全程不敲 CLI 完成选手/队伍增删改查与绑定审批。
 
