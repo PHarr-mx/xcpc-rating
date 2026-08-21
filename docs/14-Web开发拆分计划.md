@@ -103,7 +103,7 @@ admin-only 字段只读展示并注明原因。
 
 **坑**：reflex 0.9.7 computed var `cache=True` 无 interval = 永不失效 → 自助字段 / OJ 账号 / 列表类 var 一律 `cache=False`，否则同会话二次操作读到旧快照（连加 OJ 账号会覆盖前一个）。
 
-### P4a · `/admin/players` 选手 CRUD
+### P4a · `/admin/players` 选手 CRUD 🔨（2026-08-21 规划）
 
 任务：
 
