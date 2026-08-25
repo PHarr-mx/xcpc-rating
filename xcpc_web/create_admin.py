@@ -1,7 +1,8 @@
 """CLI to create the first admin user in the Reflex auth DB.
 
 Usage:
-    python create_admin.py --username admin --password secret
+    python create_admin.py --username admin --password secret          # 创建首个 admin
+    python create_admin.py --username admin --password newpass --reset-password  # 重置已有用户密码
 """
 
 from __future__ import annotations
@@ -69,14 +70,48 @@ def create_admin(username: str, password: str) -> int:
         return user.id
 
 
+def reset_password(username: str, password: str) -> int:
+    """Reset an existing user's password; invalidate their active sessions."""
+    engine = _get_engine()
+    with Session(engine) as session:
+        existing = session.exec(
+            select(LocalUser).where(LocalUser.username == username)
+        ).one_or_none()
+        if existing is None:
+            print(
+                f"User {username!r} does not exist; cannot reset password. "
+                "Create them first (without --reset-password).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        existing.password_hash = LocalUser.hash_password(password)
+        # 密码变更后使该用户的既有会话失效，防止旧会话继续以原密码持有者身份登录。
+        for auth_session in session.exec(
+            select(LocalAuthSession).where(LocalAuthSession.user_id == existing.id)
+        ):
+            session.delete(auth_session)
+        session.commit()
+        return existing.id
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create the first admin user.")
+    parser = argparse.ArgumentParser(description="Create or reset an admin user.")
     parser.add_argument("--username", required=True)
     parser.add_argument("--password", required=True)
+    parser.add_argument(
+        "--reset-password",
+        action="store_true",
+        help="重置已有用户的密码并使其会话失效（用户不存在时报错）。",
+    )
     args = parser.parse_args()
 
-    user_id = create_admin(args.username, args.password)
-    print(f"Admin user {args.username!r} created (localuser.id={user_id}).")
+    if args.reset_password:
+        user_id = reset_password(args.username, args.password)
+        print(f"User {args.username!r} password reset (localuser.id={user_id}).")
+    else:
+        user_id = create_admin(args.username, args.password)
+        print(f"Admin user {args.username!r} created (localuser.id={user_id}).")
 
 
 if __name__ == "__main__":
