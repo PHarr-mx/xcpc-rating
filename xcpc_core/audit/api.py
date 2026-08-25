@@ -30,13 +30,14 @@ def configure_session(session: Session | None) -> None:
     _default_session = session
 
 
-def _get_session() -> Session:
+def _get_session() -> tuple[Session, bool]:
+    """返回 (session, owned)。owned=True 表示本函数新建、调用方须在 finally 中关闭。"""
     global _factory
     if _default_session is not None:
-        return _default_session
+        return _default_session, False
     if _factory is None:
         _factory = make_session_factory()[1]
-    return _factory()
+    return _factory(), True
 
 
 def record(
@@ -47,19 +48,23 @@ def record(
     diff_json: dict | None = None,
 ) -> int:
     """写一条审计日志，返回新行的 id。"""
-    session = _get_session()
-    log = AuditLog(
-        action=action,
-        target=target,
-        user_id=user_id,
-        diff_json=json.dumps(diff_json or {}, ensure_ascii=False),
-        at=datetime.now(timezone.utc),
-    )
-    session.add(log)
-    session.flush()
-    session.refresh(log)
-    session.commit()
-    return log.id
+    session, owned = _get_session()
+    try:
+        log = AuditLog(
+            action=action,
+            target=target,
+            user_id=user_id,
+            diff_json=json.dumps(diff_json or {}, ensure_ascii=False),
+            at=datetime.now(timezone.utc),
+        )
+        session.add(log)
+        session.flush()
+        session.refresh(log)
+        session.commit()
+        return log.id
+    finally:
+        if owned:
+            session.close()
 
 
 def list_logs(
@@ -70,31 +75,35 @@ def list_logs(
     date_to: date | None = None,
 ) -> list[dict]:
     """按条件读取审计日志，返回可跨层传递的普通字典。"""
-    session = _get_session()
-    stmt = select(AuditLog).order_by(AuditLog.at.desc(), AuditLog.id.desc())
-    if user_id is not None:
-        stmt = stmt.where(AuditLog.user_id == user_id)
-    if action:
-        stmt = stmt.where(AuditLog.action == action)
-    if date_from is not None:
-        stmt = stmt.where(AuditLog.at >= datetime.combine(date_from, datetime.min.time()))
-    if date_to is not None:
-        # 日期筛选包含当天。
-        stmt = stmt.where(
-            AuditLog.at < datetime.combine(
-                date_to,
-                datetime.min.time(),
-            ) + timedelta(days=1)
-        )
-    rows = session.scalars(stmt).all()
-    return [
-        {
-            "id": row.id,
-            "user_id": row.user_id,
-            "action": row.action,
-            "target": row.target,
-            "diff_json": row.diff_json,
-            "at": row.at.isoformat(),
-        }
-        for row in rows
-    ]
+    session, owned = _get_session()
+    try:
+        stmt = select(AuditLog).order_by(AuditLog.at.desc(), AuditLog.id.desc())
+        if user_id is not None:
+            stmt = stmt.where(AuditLog.user_id == user_id)
+        if action:
+            stmt = stmt.where(AuditLog.action == action)
+        if date_from is not None:
+            stmt = stmt.where(AuditLog.at >= datetime.combine(date_from, datetime.min.time()))
+        if date_to is not None:
+            # 日期筛选包含当天。
+            stmt = stmt.where(
+                AuditLog.at < datetime.combine(
+                    date_to,
+                    datetime.min.time(),
+                ) + timedelta(days=1)
+            )
+        rows = session.scalars(stmt).all()
+        return [
+            {
+                "id": row.id,
+                "user_id": row.user_id,
+                "action": row.action,
+                "target": row.target,
+                "diff_json": row.diff_json,
+                "at": row.at.isoformat(),
+            }
+            for row in rows
+        ]
+    finally:
+        if owned:
+            session.close()

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from xcpc_core.contest.models import Contest, ContestCreate, ContestDetail
 from xcpc_core.contest.service import ContestService
@@ -31,25 +31,51 @@ def _get_default_factory() -> sessionmaker:
     return _factory
 
 
-def get_service(*, store: ContestStore | None = None) -> ContestService:
-    """获取 ``ContestService`` 实例。"""
+def _open_service(*, store: ContestStore | None = None) -> tuple[ContestService, Session | None]:
+    """打开 service，返回 (service, owned_session)。
+
+    - 注入或已 ``configure_store`` 的 store 由外部管理，owned_session 为 ``None``；
+    - 未注入时自建短事务 session，调用方必须在 ``finally`` 中关闭，
+      否则每次调用都会向连接池借出一个连接且不归还（Reflex 并发下会耗尽池）。
+    """
     resolved = store or _default_store
     if resolved is not None:
-        return ContestService(resolved)
-    return ContestService(ContestStore(_get_default_factory()()))
+        return ContestService(resolved), None
+    session = _get_default_factory()()
+    return ContestService(ContestStore(session)), session
 
 
 def save_contest(data: ContestCreate, *, today: date | None = None, store: ContestStore | None = None) -> Contest:
-    return get_service(store=store).save_contest(data, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.save_contest(data, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def get_contest(contest_id: str, *, store: ContestStore | None = None) -> ContestDetail:
-    return get_service(store=store).get_contest(contest_id)
+    service, session = _open_service(store=store)
+    try:
+        return service.get_contest(contest_id)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def list_contests(*, source_type: str | None = None, store: ContestStore | None = None) -> list[Contest]:
-    return get_service(store=store).list_contests(source_type=source_type)
+    service, session = _open_service(store=store)
+    try:
+        return service.list_contests(source_type=source_type)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def delete_contest(contest_id: str, *, store: ContestStore | None = None) -> None:
-    return get_service(store=store).delete_contest(contest_id)
+    service, session = _open_service(store=store)
+    try:
+        return service.delete_contest(contest_id)
+    finally:
+        if session is not None:
+            session.close()

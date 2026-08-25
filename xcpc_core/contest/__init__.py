@@ -3,7 +3,6 @@ from xcpc_core.contest.api import (
     configure_store,
     delete_contest,
     get_contest,
-    get_service,
     list_contests,
     save_contest,
 )
@@ -30,7 +29,6 @@ __all__ = [
     "configure_store",
     "delete_contest",
     "get_contest",
-    "get_service",
     "list_contests",
     "save_contest",
 ]

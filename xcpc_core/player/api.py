@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from xcpc_core.db.session import make_session_factory
 from xcpc_core.player.models import Player, PlayerCreate, PlayerStatus, PlayerUpdate
@@ -32,12 +32,18 @@ def _get_default_factory() -> sessionmaker:
     return _factory
 
 
-def get_service(*, store: PlayerStore | None = None) -> PlayerService:
-    """获取 ``PlayerService`` 实例。"""
+def _open_service(*, store: PlayerStore | None = None) -> tuple[PlayerService, Session | None]:
+    """打开 service，返回 (service, owned_session)。
+
+    - 注入或已 ``configure_store`` 的 store 由外部管理，owned_session 为 ``None``；
+    - 未注入时自建短事务 session，调用方必须在 ``finally`` 中关闭，
+      否则每次调用都会向连接池借出一个连接且不归还（Reflex 并发下会耗尽池）。
+    """
     resolved = store or _default_store
     if resolved is not None:
-        return PlayerService(resolved)
-    return PlayerService(PlayerStore(_get_default_factory()()))
+        return PlayerService(resolved), None
+    session = _get_default_factory()()
+    return PlayerService(PlayerStore(session)), session
 
 
 def list_players(
@@ -48,16 +54,26 @@ def list_players(
     store: PlayerStore | None = None,
 ) -> list[Player]:
     """列出选手，支持按状态、年级筛选。"""
-    return get_service(store=store).list_players(
-        include_left=include_left,
-        status=status,
-        grade=grade,
-    )
+    service, session = _open_service(store=store)
+    try:
+        return service.list_players(
+            include_left=include_left,
+            status=status,
+            grade=grade,
+        )
+    finally:
+        if session is not None:
+            session.close()
 
 
 def get_player(player_id: str, *, store: PlayerStore | None = None) -> Player:
     """按校内 ID 查询单个选手。"""
-    return get_service(store=store).get_player(player_id)
+    service, session = _open_service(store=store)
+    try:
+        return service.get_player(player_id)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def find_by_name(
@@ -67,7 +83,12 @@ def find_by_name(
     store: PlayerStore | None = None,
 ) -> list[Player]:
     """按姓名或别名查找选手。"""
-    return get_service(store=store).find_by_name(name, grade=grade)
+    service, session = _open_service(store=store)
+    try:
+        return service.find_by_name(name, grade=grade)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def find_by_oj(
@@ -77,7 +98,12 @@ def find_by_oj(
     store: PlayerStore | None = None,
 ) -> Player | None:
     """按 OJ 平台账号查找选手，未找到返回 ``None``。"""
-    return get_service(store=store).find_by_oj(platform, handle)
+    service, session = _open_service(store=store)
+    try:
+        return service.find_by_oj(platform, handle)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def create_player(
@@ -87,7 +113,12 @@ def create_player(
     store: PlayerStore | None = None,
 ) -> Player:
     """新建选手并持久化。"""
-    return get_service(store=store).create_player(data, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.create_player(data, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def update_player(
@@ -98,7 +129,12 @@ def update_player(
     store: PlayerStore | None = None,
 ) -> Player:
     """更新选手字段并持久化。"""
-    return get_service(store=store).update_player(player_id, data, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.update_player(player_id, data, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def delete_player(
@@ -108,7 +144,12 @@ def delete_player(
     store: PlayerStore | None = None,
 ) -> Player:
     """从名册物理删除选手。"""
-    return get_service(store=store).delete_player(player_id, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.delete_player(player_id, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def mark_left(
@@ -118,4 +159,9 @@ def mark_left(
     store: PlayerStore | None = None,
 ) -> Player:
     """将选手标记为离队（软删除，``status=left``）。"""
-    return get_service(store=store).mark_left(player_id, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.mark_left(player_id, today=today)
+    finally:
+        if session is not None:
+            session.close()

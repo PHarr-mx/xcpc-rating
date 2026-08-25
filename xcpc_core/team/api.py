@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from xcpc_core.db.session import make_session_factory
 from xcpc_core.team.models import Team, TeamCreate, TeamUpdate
@@ -32,12 +32,18 @@ def _get_default_factory() -> sessionmaker:
     return _factory
 
 
-def get_service(*, store: TeamStore | None = None) -> TeamService:
-    """获取 ``TeamService`` 实例。"""
+def _open_service(*, store: TeamStore | None = None) -> tuple[TeamService, Session | None]:
+    """打开 service，返回 (service, owned_session)。
+
+    - 注入或已 ``configure_store`` 的 store 由外部管理，owned_session 为 ``None``；
+    - 未注入时自建短事务 session，调用方必须在 ``finally`` 中关闭，
+      否则每次调用都会向连接池借出一个连接且不归还（Reflex 并发下会耗尽池）。
+    """
     resolved = store or _default_store
     if resolved is not None:
-        return TeamService(resolved)
-    return TeamService(TeamStore(_get_default_factory()()))
+        return TeamService(resolved), None
+    session = _get_default_factory()()
+    return TeamService(TeamStore(session)), session
 
 
 def list_teams(
@@ -45,12 +51,22 @@ def list_teams(
     store: TeamStore | None = None,
 ) -> list[Team]:
     """列出所有队伍。"""
-    return get_service(store=store).list_teams()
+    service, session = _open_service(store=store)
+    try:
+        return service.list_teams()
+    finally:
+        if session is not None:
+            session.close()
 
 
 def get_team(team_id: str, *, store: TeamStore | None = None) -> Team:
     """按 ID 查询单个队伍。"""
-    return get_service(store=store).get_team(team_id)
+    service, session = _open_service(store=store)
+    try:
+        return service.get_team(team_id)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def find_by_members(
@@ -59,7 +75,12 @@ def find_by_members(
     store: TeamStore | None = None,
 ) -> Team | None:
     """按队员集合查找队伍，未找到返回 ``None``。"""
-    return get_service(store=store).find_by_members(members)
+    service, session = _open_service(store=store)
+    try:
+        return service.find_by_members(members)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def create_team(
@@ -69,7 +90,12 @@ def create_team(
     store: TeamStore | None = None,
 ) -> Team:
     """新建队伍并持久化。"""
-    return get_service(store=store).create_team(data, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.create_team(data, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def update_team(
@@ -80,7 +106,12 @@ def update_team(
     store: TeamStore | None = None,
 ) -> Team:
     """更新队伍字段并持久化。"""
-    return get_service(store=store).update_team(team_id, data, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.update_team(team_id, data, today=today)
+    finally:
+        if session is not None:
+            session.close()
 
 
 def delete_team(
@@ -90,4 +121,9 @@ def delete_team(
     store: TeamStore | None = None,
 ) -> Team:
     """从名册物理删除队伍。"""
-    return get_service(store=store).delete_team(team_id, today=today)
+    service, session = _open_service(store=store)
+    try:
+        return service.delete_team(team_id, today=today)
+    finally:
+        if session is not None:
+            session.close()
