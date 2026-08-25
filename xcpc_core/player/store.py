@@ -36,7 +36,7 @@ class PlayerStore:
 
     # ---- 写 ----
 
-    def insert(self, player: Player) -> None:
+    def insert(self, player: Player, *, commit: bool = True) -> None:
         self.session.add(PlayerRow(
             id=player.id,
             name=player.name,
@@ -47,9 +47,10 @@ class PlayerStore:
             updated_at=player.updated_at,
         ))
         self._write_nested(player.id, player.oj_accounts, player.aliases)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def update(self, player: Player) -> None:
+    def update(self, player: Player, *, commit: bool = True) -> None:
         row = self.session.get(PlayerRow, player.id)
         if row is None:
             raise PlayerNotFoundError(player.id)
@@ -60,16 +61,18 @@ class PlayerStore:
         row.updated_at = player.updated_at
         self._clear_nested(player.id)
         self._write_nested(player.id, player.oj_accounts, player.aliases)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def delete(self, player_id: str) -> Player | None:
+    def delete(self, player_id: str, *, commit: bool = True) -> Player | None:
         row = self.session.get(PlayerRow, player_id)
         if row is None:
             return None
         dto = self._to_dto(row)
         self._clear_nested(player_id)
         self.session.delete(row)
-        self._commit()
+        if commit:
+            self._commit()
         return dto
 
     def next_id(self) -> str:

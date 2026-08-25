@@ -59,6 +59,7 @@ class UnmatchedPlayer(BaseModel):
     name: str
     team_name: str
     rank: int
+    candidates: list[dict[str, str]] = Field(default_factory=list)
 
 
 class UnmatchedTeam(BaseModel):
@@ -67,6 +68,49 @@ class UnmatchedTeam(BaseModel):
     members: list[str]
     rank: int
     reason: str
+
+
+class StagedStanding(BaseModel):
+    """解析阶段的一行成绩；player_ids 只包含自动唯一匹配的选手。"""
+
+    row: XcpcioStandingRow
+    player_ids: list[str] = Field(default_factory=list)
+    unresolved_names: list[str] = Field(default_factory=list)
+
+
+class StagedImportPayload(BaseModel):
+    """ImportBatch.payload_json 的稳定 DTO。"""
+
+    version: int = 1
+    params: FormalImportParams
+    parsed: XcpcioParsedContest
+    contest_meta: dict[str, Any] = Field(default_factory=dict)
+    standings: list[StagedStanding] = Field(default_factory=list)
+    unmatched_players: list[UnmatchedPlayer] = Field(default_factory=list)
+    unmatched_teams: list[UnmatchedTeam] = Field(default_factory=list)
+
+
+class ImportBatchSummary(BaseModel):
+    batch_id: int
+    filename: str
+    status: str
+    contest_id: str
+    title: str
+    total_teams: int
+    school_teams_count: int
+    award_thresholds: AwardThresholds | None = None
+    standings_count: int
+    unmatched_players: list[UnmatchedPlayer] = Field(default_factory=list)
+    unmatched_teams: list[UnmatchedTeam] = Field(default_factory=list)
+
+
+class ImportBatchDetail(BaseModel):
+    batch_id: int
+    uploaded_by: int
+    filename: str
+    status: str
+    created_at: Any | None = None
+    payload: StagedImportPayload
 
 
 class CreatedPlayer(BaseModel):

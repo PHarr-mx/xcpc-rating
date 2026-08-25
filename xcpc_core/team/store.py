@@ -39,7 +39,7 @@ class TeamStore:
 
     # ---- 写 ----
 
-    def insert(self, team: Team) -> None:
+    def insert(self, team: Team, *, commit: bool = True) -> None:
         self.session.add(TeamRow(
             id=team.id,
             member_key=team.member_key,
@@ -48,9 +48,10 @@ class TeamStore:
             updated_at=team.updated_at,
         ))
         self._write_nested(team.id, team.members, team.aliases)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def update(self, team: Team) -> None:
+    def update(self, team: Team, *, commit: bool = True) -> None:
         row = self.session.get(TeamRow, team.id)
         if row is None:
             raise TeamNotFoundError(team.id)
@@ -59,16 +60,18 @@ class TeamStore:
         row.updated_at = team.updated_at
         self._clear_nested(team.id)
         self._write_nested(team.id, team.members, team.aliases)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def delete(self, team_id: str) -> Team | None:
+    def delete(self, team_id: str, *, commit: bool = True) -> Team | None:
         row = self.session.get(TeamRow, team_id)
         if row is None:
             return None
         dto = self._to_dto(row)
         self._clear_nested(team_id)
         self.session.delete(row)
-        self._commit()
+        if commit:
+            self._commit()
         return dto
 
     def next_id(self) -> str:

@@ -1,3 +1,3 @@
-from .api import configure_session, record
+from .api import configure_session, list_logs, record
 
-__all__ = ["configure_session", "record"]
+__all__ = ["configure_session", "list_logs", "record"]

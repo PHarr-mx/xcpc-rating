@@ -35,7 +35,7 @@ class TeamService:
     def find_by_members(self, members: list[str]) -> Team | None:
         return self.find_by_member_key(make_member_key(members))
 
-    def create_team(self, data: TeamCreate, *, today: date | None = None) -> Team:
+    def create_team(self, data: TeamCreate, *, today: date | None = None, commit: bool = True) -> Team:
         today = today or date.today()
         member_key = make_member_key(data.members)
         if self.find_by_member_key(member_key) is not None:
@@ -54,12 +54,12 @@ class TeamService:
             created_at=today,
         )
         try:
-            self.store.insert(team)
+            self.store.insert(team, commit=commit)
         except IntegrityError as exc:
             raise TeamAlreadyExistsError(member_key) from exc
         return team.with_derived_fields(today=today)
 
-    def add_alias(self, team_id: str, alias: str, *, today: date | None = None) -> Team:
+    def add_alias(self, team_id: str, alias: str, *, today: date | None = None, commit: bool = True) -> Team:
         """向已有队伍追加一个别名。"""
         today = today or date.today()
         alias = alias.strip()

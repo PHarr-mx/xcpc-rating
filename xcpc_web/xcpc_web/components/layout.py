@@ -24,7 +24,14 @@ def page_shell(*children) -> rx.Component:
                     ),
                     rx.cond(
                         AuthState.is_admin,
-                        rx.link("后台管理", href="/admin", size="2"),
+                        rx.hstack(
+                            rx.link("后台概览", href="/admin", size="2"),
+                            rx.link("选手管理", href="/admin/players", size="2"),
+                            rx.link("队伍管理", href="/admin/teams", size="2"),
+                            rx.link("比赛管理", href="/admin/contests", size="2"),
+                            rx.link("审计日志", href="/admin/audit", size="2"),
+                            spacing="3",
+                        ),
                     ),
                     rx.button(
                         "登出",

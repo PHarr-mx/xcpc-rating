@@ -11,8 +11,9 @@ AuditLog 到 core DB 是 best-effort，不回滚绑定。
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from xcpc_core.db.base import Base
@@ -59,3 +60,41 @@ def record(
     session.refresh(log)
     session.commit()
     return log.id
+
+
+def list_logs(
+    *,
+    user_id: int | None = None,
+    action: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[dict]:
+    """按条件读取审计日志，返回可跨层传递的普通字典。"""
+    session = _get_session()
+    stmt = select(AuditLog).order_by(AuditLog.at.desc(), AuditLog.id.desc())
+    if user_id is not None:
+        stmt = stmt.where(AuditLog.user_id == user_id)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+    if date_from is not None:
+        stmt = stmt.where(AuditLog.at >= datetime.combine(date_from, datetime.min.time()))
+    if date_to is not None:
+        # 日期筛选包含当天。
+        stmt = stmt.where(
+            AuditLog.at < datetime.combine(
+                date_to,
+                datetime.min.time(),
+            ) + timedelta(days=1)
+        )
+    rows = session.scalars(stmt).all()
+    return [
+        {
+            "id": row.id,
+            "user_id": row.user_id,
+            "action": row.action,
+            "target": row.target,
+            "diff_json": row.diff_json,
+            "at": row.at.isoformat(),
+        }
+        for row in rows
+    ]

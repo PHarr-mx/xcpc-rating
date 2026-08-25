@@ -12,7 +12,7 @@ class ContestService:
     def __init__(self, store: ContestStore | None = None) -> None:
         self.store = store or ContestStore()
 
-    def save_contest(self, data: ContestCreate, *, today: date | None = None) -> Contest:
+    def save_contest(self, data: ContestCreate, *, today: date | None = None, commit: bool = True) -> Contest:
         """保存比赛（含成绩）。已存在则整批替换 standings——重复导入以最新为准。"""
         contest = Contest(
             id=data.id,
@@ -32,9 +32,9 @@ class ContestService:
             source_file=data.source_file,
         )
         if self.store.get(data.id) is None:
-            self.store.insert(contest, data.standings)
+            self.store.insert(contest, data.standings, commit=commit)
         else:
-            self.store.update(contest, data.standings)
+            self.store.update(contest, data.standings, commit=commit)
         return contest
 
     def get_contest(self, contest_id: str) -> ContestDetail:

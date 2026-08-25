@@ -1,12 +1,12 @@
 # 开发进度
 
-> 最近更新：2026-08-20 · 对照 [docs/13-实施路线图.md](docs/13-实施路线图.md)
+> 最近更新：2026-08-24 · 对照 [docs/13-实施路线图.md](docs/13-实施路线图.md)
 >
 > 记录原则：只记「结论 + 日期」，设计细节留在 `docs/`，变更细节看 git log。
 
 ## 总体状态
 
-二期「认证」已关闭（P2a–P2f 全部完成）。三期「管理后台」已规划（P4a–P4d，2026-08-21），未开始实现。
+二期「认证」已关闭（P2a–P2f 全部完成）。三期「管理后台」正在进行，P4a、P4b、P4c 已完成，P4d Web 集成已完成，待真实浏览器验收后关闭三期。
 
 ## 分期进度
 
@@ -14,7 +14,7 @@
 |----|------|------|------|
 | 一期 | 地基 | ✅ 已完成 | P0 骨架 + P1 榜单页均完成 |
 | 二期 | 认证 | ✅ 已完成 | P2a–P2f 全部完成，2026-08-20 关闭；拆分见 §二期中详述 |
-| 三期 | 管理后台 | 🔨 已规划 | P4a–P4d 拆分见 §三期计划 |
+| 三期 | 管理后台 | 🔨 进行中 | P4a–P4c 已完成，P4d Web 集成完成，待真实浏览器验收；拆分见 §三期计划 |
 | 四期 | 业务补齐 | ⬜ 未开始 | |
 | 五期 | 上线 | ⬜ 未开始 | |
 
@@ -291,7 +291,7 @@ def pending_bindings(self) -> list[dict]:
 
 ---
 
-## 三期 · 管理后台 — 开发计划
+## 三期 · 管理后台 — 开发计划（Web 集成完成，待浏览器验收）
 
 > 关联：[14-Web开发拆分计划](./docs/14-Web开发拆分计划.md) · [08-前端与Web交互模块](./docs/08-前端与Web交互模块.md) · [13-实施路线图](./docs/13-实施路线图.md)
 
@@ -306,14 +306,19 @@ def pending_bindings(self) -> list[dict]:
 
 | Part | 内容 | 依赖 | 预计工作量 | 验收要点 |
 |------|------|------|-----------|---------|
-| **P4a** | `/admin/players` 选手 CRUD | P2e（守卫） | 1d | 列表搜筛选、弹窗表单建/改、`mark_left` 软删；`PlayerValidationError` 字段级展示 |
-| **P4b** | `/admin/teams` 队伍 CRUD | P4a | 0.5d | 队员集合建队、`member_key` 冲突提示、改队员/别名 |
-| **P4c** | `/admin/contests` 比赛管理 + `/admin/audit` 审计页 | P4a | 0.5d | 列表按 source 切、删除级联 standings/rating_event、审计按 user/action 筛 |
-| **P4d** | `/admin/import` 在线导入五步 | P4a | 1d | 上传→元信息→预览→未匹配决策→确认写入；`ImportBatch` staged→confirmed；中途关页面无半截数据 |
+| **P4a** ✅ | `/admin/players` 选手 CRUD | P2e（守卫） | 1d | 列表搜筛选、弹窗表单建/改、`mark_left` 软删；`PlayerValidationError` 字段级展示 |
+| **P4b** ✅ | `/admin/teams` 队伍 CRUD | P4a | 0.5d | 队员集合建队、`member_key` 冲突提示、别名编辑、删除 |
+| **P4c** ✅ | `/admin/contests` 比赛管理 + `/admin/audit` 审计页 | P4a | 0.5d | 列表按 source 切、删除级联 standings/rating_event、审计按 user/action 筛 |
+| **P4d** ✅* | `/admin/import` 在线导入五步 | P4a | 1d | 上传→元信息→预览→未匹配决策→确认写入；`ImportBatch` staged→confirmed；中途关页面无半截数据 |
 
 **顺序约束**：P4a→P4b→P4c 递增，P4d 理论上依赖 P4a（共享 admin 表单/列表组件），可先做 P4a 建立模式后并行。
 
 **此 Part 完成即三期关闭。**
+
+P4a 已完成：`AdminPlayersState` / `/admin/players` 已接入三层 admin 守卫；列表支持搜索、状态和年级筛选；弹窗表单支持选手 ID、姓名、Handle、入学年、状态、别名及 OJ 账号；创建、更新、标记离队均经 `player.api`，并写入审计日志。新增 7 条 Web 回归测试。
+P4b 已完成：`AdminTeamsState` / `/admin/teams` 已接入三层 admin 守卫；列表支持按队伍 ID、成员 ID/姓名、`member_key` 和别名搜索；按成员集合创建队伍，创建前校验成员存在性并预检 `member_key` 冲突；编辑遵循 core 队伍身份约束，仅追加别名，换员需新建队伍；删除经 `team.api`，创建/更新/删除均写入审计日志。新增 8 条 Web 回归测试。
+P4c 已完成：`AdminContestsState` / `/admin/contests` 支持正式赛/训练赛筛选、文本搜索和删除；`ContestStore.delete` 同步清理 standings、关联派生 `RatingEvent`；`AdminAuditState` / `/admin/audit` 支持按用户、动作和日期筛选只读日志；比赛删除写入 `contest.delete` 审计。新增 6 条 Web 回归测试，审计读取通过 `xcpc_core.audit.api.list_logs()`。
+P4d Web 集成完成：`AdminImportState` / `/admin/import` 支持 `.xlsx/.xlsm` 上传、元信息、后台 staged 解析、预览、未匹配选手决议、确认/取消；新增 staged importer API，确认阶段单事务写入正式表并在提交后归档 raw JSON，写入 `import.confirm` 审计，临时文件在确认/取消/重传时清理。真实 xlsx 已验证 staged→confirmed；core 73 + web 65（总计 138）全绿，Reflex frontend export 通过。浏览器手工验收因当前环境无法绑定前端端口，待后续环境补验。
 
 ### 3. 具体任务要点
 
@@ -349,3 +354,7 @@ def pending_bindings(self) -> list[dict]:
 | 2026-08-20 | P2a–P2d 实测验证（临时 DB 隔离 + 真实状态链，非文档背书）：注册/登录/绑定/权限 var 链全通。新增 `xcpc_web/tests/` 测试基建（21 条）；修 core `update_player` oj_accounts dict 退化 + P2d computed var 缓存永不失效（`cache=False`）；core 73 + web 21 全绿 |
 | 2026-08-20 | P2e+P2f 完成（二期关闭）：三层守卫 + `/admin` 概览 + `/admin/users` 审批（批准/驳回/unique 预检/自动驳回其余 pending）+ 新 `xcpc_core/audit/api.py`（AuditLog 写入）+ 顶栏后台入口；web 测试 21→39；core 73 + web 39 全绿 |
 | 2026-08-21 | 三期规划入文档：P4a（选手 CRUD）/P4b（队伍 CRUD）/P4c（比赛+审计）/P4d（在线导入），三个 doc 同步更新 |
+| 2026-08-24 | P4a 完成：`/admin/players` 选手 CRUD、筛选、软删、字段级校验与审计；core 73 + web 46 全绿，Reflex production frontend export 通过 |
+| 2026-08-24 | P4b 完成：`/admin/teams` 队伍 CRUD、成员集合冲突预检、别名编辑、删除与审计；core 73 + web 54（总计 127）全绿，Reflex production frontend export 通过 |
+| 2026-08-24 | P4c 完成：`/admin/contests` 比赛管理 + `/admin/audit` 审计页、审计查询 API、比赛删除级联 standings/rating_event；core 73 + web 60（总计 133）全绿，Reflex production frontend export 通过 |
+| 2026-08-25 | P4d Web 集成完成：`/admin/import` 上传/元信息/后台 staged 解析/预览/未匹配决议/确认导入；ImportBatch staged→confirmed，确认写入 `import.confirm` 审计；上传临时文件在确认/取消/重传时清理；core 73 + web 65（总计 138）全绿，真实 xlsx staged→confirmed 流程验证通过，Reflex frontend export 通过；待浏览器手工验收后关闭三期 |

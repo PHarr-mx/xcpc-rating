@@ -15,6 +15,7 @@ from xcpc_core.contest.models import Contest, Standing
 from xcpc_core.db.tables import Contest as ContestRow
 from xcpc_core.db.tables import Standing as StandingRow
 from xcpc_core.db.tables import StandingMember as StandingMemberRow
+from xcpc_core.db.tables import RatingEvent as RatingEventRow
 
 
 class ContestStore:
@@ -43,12 +44,13 @@ class ContestStore:
 
     # ---- 写 ----
 
-    def insert(self, contest: Contest, standings: list[Standing]) -> None:
+    def insert(self, contest: Contest, standings: list[Standing], *, commit: bool = True) -> None:
         self.session.add(self._to_row(contest))
         self._write_standings(contest.id, standings)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def update(self, contest: Contest, standings: list[Standing]) -> None:
+    def update(self, contest: Contest, standings: list[Standing], *, commit: bool = True) -> None:
         row = self.session.get(ContestRow, contest.id)
         if row is None:
             raise ContestNotFoundError(contest.id)
@@ -68,15 +70,22 @@ class ContestStore:
         row.source_file = contest.source_file
         self._clear_standings(contest.id)
         self._write_standings(contest.id, standings)
-        self._commit()
+        if commit:
+            self._commit()
 
-    def delete(self, contest_id: str) -> None:
+    def delete(self, contest_id: str, *, commit: bool = True) -> None:
         row = self.session.get(ContestRow, contest_id)
         if row is None:
             return
         self._clear_standings(contest_id)
+        # RatingEvent 是由 Contest/Standing 派生的非事实表，event_id
+        # 约定以 ``{contest_id}#`` 开头；删除比赛时同步清理，避免旧事件继续进入榜单。
+        for event in self.session.scalars(select(RatingEventRow)).all():
+            if event.event_id.startswith(f"{contest_id}#"):
+                self.session.delete(event)
         self.session.delete(row)
-        self._commit()
+        if commit:
+            self._commit()
 
     # ---- 内部：ORM ↔ DTO ----
 

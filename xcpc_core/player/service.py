@@ -59,7 +59,7 @@ class PlayerService:
                 results.append(player)
         return results
 
-    def create_player(self, data: PlayerCreate, *, today: date | None = None) -> Player:
+    def create_player(self, data: PlayerCreate, *, today: date | None = None, commit: bool = True) -> Player:
         today = today or date.today()
         player_id = data.id or self.store.next_id()
         if self.store.get(player_id) is not None:
@@ -76,7 +76,7 @@ class PlayerService:
             created_at=today,
         )
         try:
-            self.store.insert(player)
+            self.store.insert(player, commit=commit)
         except IntegrityError as exc:
             raise PlayerValidationError(_UNIQUE_VIOLATION_MSG) from exc
         return player.with_derived_fields(today=today)

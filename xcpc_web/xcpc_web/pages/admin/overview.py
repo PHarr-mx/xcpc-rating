@@ -63,6 +63,29 @@ def _overview() -> rx.Component:
             rx.button("前往绑定审批", color_scheme="green"),
             href="/admin/users",
         ),
+        rx.hstack(
+            rx.link(
+                rx.button("前往选手管理", variant="soft"),
+                href="/admin/players",
+            ),
+            rx.link(
+                rx.button("前往队伍管理", variant="soft"),
+                href="/admin/teams",
+            ),
+            rx.link(
+                rx.button("前往比赛管理", variant="soft"),
+                href="/admin/contests",
+            ),
+            rx.link(
+                rx.button("查看审计日志", variant="soft"),
+                href="/admin/audit",
+            ),
+            rx.link(
+                rx.button("在线导入正式赛", variant="soft"),
+                href="/admin/import",
+            ),
+            spacing="3",
+        ),
         spacing="6",
         width="100%",
         max_width="60em",

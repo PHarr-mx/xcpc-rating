@@ -45,6 +45,12 @@ from xcpc_core.db import tables as _core_tables  # noqa: E402, F401  注册 core
 from xcpc_core.db.base import Base  # noqa: E402
 from xcpc_core.player import api as player_api  # noqa: E402
 from xcpc_core.player.store import PlayerStore  # noqa: E402
+from xcpc_core.contest import api as contest_api  # noqa: E402
+from xcpc_core.contest.store import ContestStore  # noqa: E402
+from xcpc_core.team import api as team_api  # noqa: E402
+from xcpc_core.team.store import TeamStore  # noqa: E402
+from xcpc_core.audit import api as audit_api  # noqa: E402
+from xcpc_core.importer import api as importer_api  # noqa: E402
 
 from xcpc_web.states.auth import AuthState  # noqa: E402
 from xcpc_web.states.auth_models import BindingRequest, UserProfile  # noqa: E402, F401
@@ -79,12 +85,17 @@ def core_store():
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     session = factory()
     player_api.configure_store(PlayerStore(session))
+    team_api.configure_store(TeamStore(session))
+    contest_api.configure_store(ContestStore(session))
+    audit_api.configure_session(session)
+    importer_api.configure_session(session)
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
-    from xcpc_core.audit import api as audit_api
-
+    team_api.configure_store(None)  # type: ignore[arg-type]
+    contest_api.configure_store(None)  # type: ignore[arg-type]
     audit_api.configure_session(None)  # type: ignore[arg-type]
+    importer_api.configure_session(None)
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()

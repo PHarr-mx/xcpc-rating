@@ -21,7 +21,7 @@
 | **P1** ✅ | 榜单只读页 `/` | 一期（收官） | P0 | 浏览器看到真实数据榜单，筛选/搜索/排序可用 |
 | **P2** ✅ | 认证底座：登录注册 + AuthState + 权限守卫 | 二期 | P1 | 未登录访问 `/profile` 被重定向 |
 | **P3** ✅ | `/profile` 自助资料 + 绑定申请 | 二期 | P2 | 用户可提交绑定申请，admin 可审批 |
-| **P4a–P4d** | 三期后台 CRUD ×4：选手 / 队伍 / 比赛与审计 / 在线导入 | 三期 | P2 | Web 端完成全部增删改查 + 导入 |
+| **P4a–P4d** ✅* | 三期后台 CRUD ×4：选手 / 队伍 / 比赛与审计 / 在线导入 | 三期 | P2 | Web 端完成全部增删改查 + 导入 |
 | **P5** | 详情页与图表：`/players/{id}` `/contests/{id}` `/about` | 一期后即可插入 | P1 | 详情页渲染真实记录，Rating 曲线可见 |
 | **P6** | 权重试算 `/admin/rating` | 四期 | P4c | 试算 diff 可见，应用后榜单变化 |
 
@@ -103,39 +103,42 @@ admin-only 字段只读展示并注明原因。
 
 **坑**：reflex 0.9.7 computed var `cache=True` 无 interval = 永不失效 → 自助字段 / OJ 账号 / 列表类 var 一律 `cache=False`，否则同会话二次操作读到旧快照（连加 OJ 账号会覆盖前一个）。
 
-### P4a · `/admin/players` 选手 CRUD 🔨（2026-08-21 规划）
+### P4a · `/admin/players` 选手 CRUD ✅（2026-08-24）
 
 任务：
 
 - `AdminPlayersState(AdminState)`：`players` 列表（含 `status`/`grade` 筛选）、弹窗表单（`rx.dialog`）建/改选手
 - 批量操作：`mark_left` 软删（`delete_player` 物理删留 CLI，Web 端主要用软删）
 - 字段：`PlayerCreate`/`PlayerUpdate`（用 core 的 Pydantic 校验）；`PlayerValidationError` 消息直接展示到字段（08 §6）
-- 写操作首行 `_require_admin()`，审计 `audit_api.record(action="player.create|update|mark_left", ...)`
+- 写操作首行 `_require_admin()`，审计 `audit_api.record(action="player.create|update|delete", ...)`
 
-验收：admin 浏览器完成选手新增/改资料/软删，唯一性冲突（如 OJ 账号已绑他人）字段级显示。
+验收：admin 浏览器完成选手新增/改资料/软删，唯一性冲突（如 OJ 账号已绑他人）字段级显示。✅ 已完成；新增 7 条 Web 回归测试，core 73 + web 46 全绿，Reflex production frontend export 通过。
 
-### P4b · `/admin/teams` 队伍 CRUD
+### P4b · `/admin/teams` 队伍 CRUD ✅（2026-08-24）
 
-任务：队伍列表、按队员集合建队（`TeamCreate(members=...)`）、`member_key` 冲突时提示已存在的队、改队员/别名（`aliases`）。用 core `team.api` 的 `find_by_members` 做冲突预检。
+任务：队伍列表、按队员集合建队（`TeamCreate(members=...)`）、`member_key` 冲突时提示已存在的队、别名编辑与删除。用 core `team.api` 的 `find_by_members` 做冲突预检；成员 ID 通过 `player.api` 校验。
 
-验收：admin 浏览器完成队伍建改删，同队员集合建重队被提示。
+队伍身份由成员集合决定：Web 编辑遵循 `skill/team-manage/SKILL.md` 的约束，仅追加别名，不原地修改 `members`；换员请新建队伍。创建、更新、删除均写入 `team.create|update|delete` 审计日志。
 
-### P4c · `/admin/contests` + `/admin/audit`
+验收：admin 浏览器完成队伍建改删，同队员集合建重队被提示。✅ 已完成；新增 8 条 Web 回归测试，core 73 + web 54（总计 127）全绿，Reflex production frontend export 通过。
+
+### P4c · `/admin/contests` + `/admin/audit` ✅（2026-08-24）
 
 任务：
 
-- `/admin/contests`：比赛列表（按 `source_type` 切 formal/training）+ 删除（core `contest.api.delete_contest` 已级联删 standings/rating_event）
-- `/admin/audit`：审计日志列表，按 `user_id`/`action`/时间筛选；只读（写仅由各业务操作触发）
+- `/admin/contests`：比赛列表（按 `source_type` 切 formal/training）+ 文本搜索 + 删除；core `contest.api.delete_contest` 清理 standings，并同步删除 `event_id` 以 `{contest_id}#` 开头的派生 `RatingEvent`
+- `/admin/audit`：审计日志列表，按用户名/用户 ID、`action`、起止日期筛选；只读（写仅由各业务操作触发）
+- 新增 `xcpc_core.audit.api.list_logs()` 作为审计查询入口，Web 不直接读 core 表
 
-验收：删除比赛后榜单与成绩消失；审计可按 user/action 筛出绑定审批与 CRUD 记录。
+验收：删除比赛后榜单与成绩消失；审计可按 user/action 筛出绑定审批与 CRUD 记录。✅ 已完成；新增 6 条 Web 回归测试，core 73 + web 60（总计 133）全绿，Reflex production frontend export 通过。
 
-### P4d · `/admin/import` 在线导入五步
+### P4d · `/admin/import` 在线导入五步 ✅（Web 集成完成，2026-08-25）
 
 任务：上传 → 填元信息（`contest_id`/日期/`contest_type`）→ 解析预览（队数/本校/奖牌线）→ 未匹配项人工决策（新建选手 or 指定现存）→ 确认写入。解析结果先落 `ImportBatch(status=staged)`，确认才写正式表；长解析 `@rx.event(background=True)` 不进写事务（[08](./08-前端与Web交互模块.md) §4.4、[12](./12-开发流程建议.md) §8）。写 `import.confirm` 审计。
 
-**前置**：core 导入目前是 `import_formal_xcpcio_xlsx` 一体化函数（无 staged 流程），P4d 需先把 importer 拆出「parse → 决议 → 写入」两段（增量 core 改动，复用现有 `importer/` 模块）。
+实现：新增 staged importer API（`stage_formal_xlsx` / `confirm_import_batch` / `discard_import_batch`），并接入 `/admin/import`。上传文件使用安全临时路径，确认、取消及重新上传时清理；解析阶段不创建正式 Player / Team / Contest，确认阶段以单个 core DB transaction 写入，提交成功后再归档 raw JSON。
 
-验收：用真实省赛 xlsx 走通全流程；中途关页面无半截数据。**此 Part 完成即三期关闭。**
+验证：真实省赛 xlsx 已走通 staged → confirmed 全流程（解析 312 支队伍、6 条正式成绩、18 个未匹配选手）；core + web 共 138 条测试通过，Reflex frontend export 通过。浏览器手工验收仍待在可绑定端口的运行环境中完成；在此之前三期保持“收尾”状态。
 
 ### P5 · 详情页与图表
 
@@ -168,4 +171,4 @@ admin-only 字段只读展示并注明原因。
 
 ---
 
-*文档版本：v1.3 — 二期已完成（2026-08-20），三期 P4a–P4d 已规划（2026-08-21）。*
+*文档版本：v1.6 — 二期已完成（2026-08-20），三期 P4a–P4d Web 集成已完成（2026-08-25），待浏览器手工验收后关闭三期。*
