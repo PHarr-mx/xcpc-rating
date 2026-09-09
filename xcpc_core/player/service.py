@@ -14,6 +14,10 @@ from xcpc_core.player.store import PlayerStore
 
 _UNIQUE_VIOLATION_MSG = "校内 handle 或 OJ 账号与他人重复"
 
+# 状态流转守卫：仅预备队员可通过考核转为现役；
+# 退役/离队是有独立语义的终态，不允许借「入队」复活（用 update 显式改状态）。
+_ACTIVATABLE_STATUSES = (PlayerStatus.probation,)
+
 
 class PlayerService:
     def __init__(self, store: PlayerStore | None = None) -> None:
@@ -117,5 +121,30 @@ class PlayerService:
         return self.update_player(
             player_id,
             PlayerUpdate(status=PlayerStatus.left),
+            today=today,
+        )
+
+    def mark_retired(self, player_id: str, *, today: date | None = None) -> Player:
+        """退役：保留档案、历史成绩与 Rating，且仍出现在榜单。"""
+        return self.update_player(
+            player_id,
+            PlayerUpdate(status=PlayerStatus.retired),
+            today=today,
+        )
+
+    def mark_active(self, player_id: str, *, today: date | None = None) -> Player:
+        """入队：预备队员通过入队考核后转为现役。
+
+        仅 ``probation`` 状态的选手可入队；其余状态抛
+        ``PlayerValidationError``，避免退役/离队选手被误操作复活。
+        """
+        current = self.get_player(player_id)
+        if current.status not in _ACTIVATABLE_STATUSES:
+            raise PlayerValidationError(
+                f"只有预备队员可以入队，选手 {player_id} 当前状态为 {current.status_label}"
+            )
+        return self.update_player(
+            player_id,
+            PlayerUpdate(status=PlayerStatus.active),
             today=today,
         )

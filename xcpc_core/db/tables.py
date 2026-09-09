@@ -31,7 +31,7 @@ class Player(Base):
     name: Mapped[str] = mapped_column(String)
     handle: Mapped[str | None] = mapped_column(String, unique=True)
     grade: Mapped[int] = mapped_column(Integer, default=0)  # 0 = 未设置
-    status: Mapped[str] = mapped_column(String, default="active")  # active|retired|left
+    status: Mapped[str] = mapped_column(String, default="active")  # probation|active|retired|left
     created_at: Mapped[date | None] = mapped_column(Date)
     updated_at: Mapped[date | None] = mapped_column(Date)
 

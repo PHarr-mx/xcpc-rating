@@ -57,7 +57,9 @@ from xcpc_core.player import (
     find_by_oj,
     get_player,
     list_players,
+    mark_active,
     mark_left,
+    mark_retired,
     update_player,
 )
 from xcpc_core.player.models import OJAccount, PlayerCreate, PlayerStatus, PlayerUpdate
@@ -112,10 +114,12 @@ update_player(
 )
 ```
 
-### 离队 / 删除
+### 入队 / 退役 / 离队 / 删除
 
 ```python
-mark_left("p001")       # 软删除，保留档案
+mark_active("p001")     # 入队：预备队员通过考核后转现役（仅 probation 可调用）
+mark_retired("p001")    # 退役：档案、Rating、榜单展示均保留（毕业/转教练）
+mark_left("p001")       # 软删除，保留档案，榜单不再展示
 delete_player("p001")   # 物理删除，慎用
 ```
 
@@ -128,7 +132,7 @@ xcpc-player list --visible-only
 # 按姓名查找
 xcpc-player find --name 张三
 
-# 新建（grade 可为 0）
+# 新建（grade 可为 0；招新入册用 --status probation）
 xcpc-player create --name 王五 --grade 2025
 
 # 更新入学年、别名
@@ -138,7 +142,13 @@ xcpc-player update p001 --grade 2024 --aliases 王五,WW
 xcpc-player update p001 \
   --oj-accounts '[{"platform":"codeforces","handle":"wangwu"}]'
 
-# 标记离队
+# 入队（预备队员 → 现役）
+xcpc-player mark-active p001
+
+# 标记退役（保留榜单展示）
+xcpc-player mark-retired p001
+
+# 标记离队（软删除）
 xcpc-player mark-left p001
 ```
 
@@ -174,4 +184,4 @@ xcpc-player mark-left p001
 
 - 不要绕过 API 直接改 SQLite 或 raw JSON（`roster.json` 只是迁移源，不是数据事实）
 - 未经用户要求不要 `git commit`
-- 物理删除前确认无历史成绩关联需求（优先 `mark_left`）
+- 物理删除前确认无历史成绩关联需求（优先 `mark_active` / `mark_left` / `mark_retired`）

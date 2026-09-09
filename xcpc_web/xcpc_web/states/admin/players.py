@@ -142,6 +142,12 @@ class AdminPlayersState(AdminState):
         return sum(p["status"] == PlayerStatus.active.value for p in self.players)
 
     @rx.var(cache=False)
+    def probation_count(self) -> int:
+        if not self.is_admin:
+            return 0
+        return sum(p["status"] == PlayerStatus.probation.value for p in self.players)
+
+    @rx.var(cache=False)
     def retired_count(self) -> int:
         if not self.is_admin:
             return 0
@@ -323,6 +329,47 @@ class AdminPlayersState(AdminState):
             diff={"status": PlayerStatus.left.value},
         )
         self.admin_feedback = f"已将选手标记为离队：{player.name}（{player.id}）"
+
+    @rx.event
+    def mark_player_retired(self, player_id: str):
+        """标记退役：状态改为 ``retired``，档案与榜单保留。"""
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self._clear_messages()
+        try:
+            player = player_api.mark_retired(player_id)
+        except PlayerError as exc:
+            self.admin_error = str(exc)
+            return
+        self._write_audit(
+            action="player.update",
+            target=player.id,
+            diff={"status": PlayerStatus.retired.value},
+        )
+        self.admin_feedback = f"已将选手标记为退役：{player.name}（{player.id}）"
+
+    @rx.event
+    def mark_player_active(self, player_id: str):
+        """入队：预备队员通过入队考核后转为现役。
+
+        仅 ``probation`` 状态可入队（core 侧守卫）；其余状态按钮本就不显示。
+        """
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self._clear_messages()
+        try:
+            player = player_api.mark_active(player_id)
+        except PlayerError as exc:
+            self.admin_error = str(exc)
+            return
+        self._write_audit(
+            action="player.update",
+            target=player.id,
+            diff={"status": PlayerStatus.active.value},
+        )
+        self.admin_feedback = f"选手已入队（转为现役）：{player.name}（{player.id}）"
 
     # ---- 内部工具 ----
 

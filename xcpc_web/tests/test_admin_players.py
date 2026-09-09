@@ -112,6 +112,51 @@ def test_admin_mark_left_is_soft_delete(build_state, make_user, core_store, play
     assert [(log.action, log.target) for log in logs] == [("player.delete", player.id)]
 
 
+def test_admin_mark_retired_is_status_update(build_state, make_user, core_store, player):
+    admin = make_user("root", role="admin")
+    audit_api.configure_session(core_store)
+    state = build_state(AdminPlayersState, admin)
+
+    state.mark_player_retired(player.id)
+
+    assert player_api.get_player(player.id).status == PlayerStatus.retired
+    # 退役不是删除：选手仍在默认（排除 left）列表中可见
+    assert [item["id"] for item in state.players] == [player.id]
+    assert state.admin_feedback == f"已将选手标记为退役：甲同学（{player.id}）"
+    logs = core_store.execute(select(AuditLog)).scalars().all()
+    assert [(log.action, log.target) for log in logs] == [("player.update", player.id)]
+
+
+def test_admin_mark_active_promotes_probation(build_state, make_user, core_store):
+    probation = player_api.create_player(
+        PlayerCreate(name="预备同学", grade=2026, status=PlayerStatus.probation)
+    )
+    admin = make_user("root", role="admin")
+    audit_api.configure_session(core_store)
+    state = build_state(AdminPlayersState, admin)
+
+    state.mark_player_active(probation.id)
+
+    assert player_api.get_player(probation.id).status == PlayerStatus.active
+    assert state.admin_feedback == f"选手已入队（转为现役）：预备同学（{probation.id}）"
+    logs = core_store.execute(select(AuditLog)).scalars().all()
+    assert [(log.action, log.target) for log in logs] == [("player.update", probation.id)]
+
+
+def test_admin_mark_active_rejects_non_probation(build_state, make_user, core_store, player):
+    admin = make_user("root", role="admin")
+    audit_api.configure_session(core_store)
+    state = build_state(AdminPlayersState, admin)
+
+    state.mark_player_active(player.id)
+
+    # core 守卫拒绝（player 为 active），错误透出且状态不变
+    assert state.admin_error != ""
+    assert state.admin_feedback == ""
+    assert player_api.get_player(player.id).status == PlayerStatus.active
+    assert core_store.execute(select(AuditLog)).scalars().all() == []
+
+
 def test_validation_error_is_shown_by_field(build_state, make_user, core_store):
     state = build_state(AdminPlayersState, make_user("root", role="admin"))
     state.form_name = ""

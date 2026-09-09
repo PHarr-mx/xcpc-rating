@@ -7,7 +7,9 @@ from xcpc_core.player.api import (
     find_by_oj,
     get_player,
     list_players,
+    mark_active,
     mark_left,
+    mark_retired,
     update_player,
 )
 from xcpc_core.player.exceptions import (
@@ -41,6 +43,8 @@ __all__ = [
     "find_repo_root",
     "get_player",
     "list_players",
+    "mark_active",
     "mark_left",
+    "mark_retired",
     "update_player",
 ]

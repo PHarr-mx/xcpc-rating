@@ -128,7 +128,7 @@ computed var —— 见 [09](./09-认证与权限模块.md) §4。
 - 搜索框实时过滤（服务端算，无需前端分页逻辑）
 - 列排序点表头即可，`sort_by` 是 state var
 - 不再展示 `built_at`（数据是实时的），改展示 `data_version`
-- `status=left` 的选手不出现；`retired` 显示「退役」标记，数据与 Rating 保留
+- `status=left` 的选手不出现；`retired` 显示「退役」标记，数据与 Rating 保留；`probation`（预备队员）可正常上榜（打过比赛才有行）
 
 ### 4.2 选手详情 `/players/{id}`
 

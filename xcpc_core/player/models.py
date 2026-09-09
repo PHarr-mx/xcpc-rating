@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 OJPlatform = Literal["codeforces", "atcoder", "luogu", "nowcoder"]
 
 STATUS_LABELS: dict[str, str] = {
+    "probation": "预备队员",
     "active": "现役",
     "retired": "退役",
     "left": "离队",
@@ -16,6 +17,7 @@ STATUS_LABELS: dict[str, str] = {
 
 
 class PlayerStatus(str, Enum):
+    probation = "probation"  # 招新通过考试入册，尚未通过入队考核
     active = "active"
     retired = "retired"
     left = "left"

@@ -165,3 +165,33 @@ def mark_left(
     finally:
         if session is not None:
             session.close()
+
+
+def mark_retired(
+    player_id: str,
+    *,
+    today: date | None = None,
+    store: PlayerStore | None = None,
+) -> Player:
+    """将选手标记为退役（``status=retired``，档案与榜单保留）。"""
+    service, session = _open_service(store=store)
+    try:
+        return service.mark_retired(player_id, today=today)
+    finally:
+        if session is not None:
+            session.close()
+
+
+def mark_active(
+    player_id: str,
+    *,
+    today: date | None = None,
+    store: PlayerStore | None = None,
+) -> Player:
+    """将预备队员转为现役（入队考核通过）；仅 ``probation`` 状态可调用。"""
+    service, session = _open_service(store=store)
+    try:
+        return service.mark_active(player_id, today=today)
+    finally:
+        if session is not None:
+            session.close()

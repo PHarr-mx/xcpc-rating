@@ -133,6 +133,28 @@ def cmd_mark_left(args: Namespace, plog: Plog) -> int:
     return 0
 
 
+def cmd_mark_retired(args: Namespace, plog: Plog) -> int:
+    plog.info("标记退役", player_id=args.player_id)
+    player = api.mark_retired(args.player_id)
+    plog.info("选手已标记退役", player_id=player.id, name=player.name)
+    if args.json:
+        print(json.dumps(player.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"已标记退役: {player.id} {player.name}")
+    return 0
+
+
+def cmd_mark_active(args: Namespace, plog: Plog) -> int:
+    plog.info("入队", player_id=args.player_id)
+    player = api.mark_active(args.player_id)
+    plog.info("选手已入队", player_id=player.id, name=player.name)
+    if args.json:
+        print(json.dumps(player.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    else:
+        print(f"已入队: {player.id} {player.name}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xcpc-player", description="选手增删改查")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出")
@@ -177,6 +199,12 @@ def build_parser() -> argparse.ArgumentParser:
     mark_left_parser = subparsers.add_parser("mark-left", help="将选手标记为离队（软删除）")
     mark_left_parser.add_argument("player_id")
 
+    mark_retired_parser = subparsers.add_parser("mark-retired", help="将选手标记为退役（档案与榜单保留）")
+    mark_retired_parser.add_argument("player_id")
+
+    mark_active_parser = subparsers.add_parser("mark-active", help="将预备队员转为现役（入队考核通过）")
+    mark_active_parser.add_argument("player_id")
+
     return parser
 
 
@@ -188,6 +216,7 @@ _COMMANDS: dict[str, Callable[[Namespace, Plog], int]] = {
     "update": cmd_update,
     "delete": cmd_delete,
     "mark-left": cmd_mark_left,
+    "mark-retired": cmd_mark_retired,
 }
 
 

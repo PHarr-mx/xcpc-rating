@@ -107,7 +107,7 @@ def _player_form() -> rx.Component:
                 _field(
                     "状态",
                     rx.select(
-                        ["active", "retired", "left"],
+                        ["probation", "active", "retired", "left"],
                         value=AdminPlayersState.form_status,
                         on_change=AdminPlayersState.set_form_status,
                         width="100%",
@@ -185,6 +185,7 @@ def _players_table() -> rx.Component:
                                             p["status_label"],
                                             color_scheme=rx.match(
                                                 p["status"],
+                                                ("probation", "blue"),
                                                 ("active", "green"),
                                                 ("retired", "orange"),
                                                 ("left", "gray"),
@@ -209,15 +210,44 @@ def _players_table() -> rx.Component:
                                                 on_click=AdminPlayersState.open_edit(p["id"]),
                                             ),
                                             rx.cond(
-                                                p["status"] != "left",
+                                                p["status"] == "probation",
                                                 rx.button(
-                                                    "标记离队",
+                                                    "入队",
                                                     size="1",
-                                                    variant="ghost",
-                                                    color_scheme="red",
-                                                    on_click=AdminPlayersState.mark_player_left(p["id"]),
+                                                    variant="soft",
+                                                    color_scheme="green",
+                                                    on_click=AdminPlayersState.mark_player_active(p["id"]),
                                                 ),
-                                                rx.text("已离队", size="1", color_scheme="gray"),
+                                                rx.cond(
+                                                    p["status"] == "active",
+                                                    rx.fragment(
+                                                        rx.button(
+                                                            "标记退役",
+                                                            size="1",
+                                                            variant="ghost",
+                                                            color_scheme="orange",
+                                                            on_click=AdminPlayersState.mark_player_retired(p["id"]),
+                                                        ),
+                                                        rx.button(
+                                                            "标记离队",
+                                                            size="1",
+                                                            variant="ghost",
+                                                            color_scheme="red",
+                                                            on_click=AdminPlayersState.mark_player_left(p["id"]),
+                                                        ),
+                                                    ),
+                                                    rx.cond(
+                                                        p["status"] == "retired",
+                                                        rx.button(
+                                                            "标记离队",
+                                                            size="1",
+                                                            variant="ghost",
+                                                            color_scheme="red",
+                                                            on_click=AdminPlayersState.mark_player_left(p["id"]),
+                                                        ),
+                                                        rx.text("已离队", size="1", color_scheme="gray"),
+                                                    ),
+                                                ),
                                             ),
                                             spacing="2",
                                         )
@@ -248,7 +278,12 @@ def admin_players() -> rx.Component:
                 rx.hstack(
                     rx.vstack(
                         rx.heading("选手管理", size="7"),
-                        rx.text("通过 Web 管理选手名册；标记离队会保留历史记录。", size="2", color_scheme="gray"),
+                        rx.text(
+                            "通过 Web 管理选手名册；招新入册为预备队员，通过入队考核后点「入队」转为现役；"
+                            "标记退役保留榜单展示，标记离队为软删除。",
+                            size="2",
+                            color_scheme="gray",
+                        ),
                         align="start",
                         spacing="1",
                     ),
@@ -266,7 +301,7 @@ def admin_players() -> rx.Component:
                         width="100%",
                     ),
                     rx.select(
-                        ["all", "active", "retired", "left"],
+                        ["all", "probation", "active", "retired", "left"],
                         value=AdminPlayersState.status_filter,
                         on_change=AdminPlayersState.set_status_filter,
                         width="10em",
@@ -282,6 +317,7 @@ def admin_players() -> rx.Component:
                     spacing="3",
                 ),
                 rx.hstack(
+                    rx.badge(rx.text("预备 "), AdminPlayersState.probation_count, color_scheme="blue"),
                     rx.badge(rx.text("现役 "), AdminPlayersState.active_count, color_scheme="green"),
                     rx.badge(rx.text("退役 "), AdminPlayersState.retired_count, color_scheme="orange"),
                     rx.badge(rx.text("离队 "), AdminPlayersState.left_count, color_scheme="gray"),
