@@ -23,3 +23,6 @@ backend/data/config.yaml
 .idea/
 .vscode/
 .claude
+
+# ZCode 会话产物（AI 计划文件）
+.zcode/

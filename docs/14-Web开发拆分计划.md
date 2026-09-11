@@ -21,7 +21,7 @@
 | **P1** ✅ | 榜单只读页 `/` | 一期（收官） | P0 | 浏览器看到真实数据榜单，筛选/搜索/排序可用 |
 | **P2** ✅ | 认证底座：登录注册 + AuthState + 权限守卫 | 二期 | P1 | 未登录访问 `/profile` 被重定向 |
 | **P3** ✅ | `/profile` 自助资料 + 绑定申请 | 二期 | P2 | 用户可提交绑定申请，admin 可审批 |
-| **P4a–P4d** ✅* | 三期后台 CRUD ×4：选手 / 队伍 / 比赛与审计 / 在线导入 | 三期 | P2 | Web 端完成全部增删改查 + 导入 |
+| **P4a–P4d** ✅ | 三期后台 CRUD ×4：选手 / 队伍 / 比赛与审计 / 在线导入 | 三期 | P2 | Web 端完成全部增删改查 + 导入 |
 | **P5** | 详情页与图表：`/players/{id}` `/contests/{id}` `/about` | 一期后即可插入 | P1 | 详情页渲染真实记录，Rating 曲线可见 |
 | **P6** | 权重试算 `/admin/rating` | 四期 | P4c | 试算 diff 可见，应用后榜单变化 |
 
@@ -76,10 +76,10 @@ xcpc_web/
 3. ✅ `components/layout.py`：`page_shell`（nav + footer）
 4. ✅ `components/board_table.py`：表格，表头点击切 `sort_by`；meta 条展示 `algorithm` + `data_version`
 5. ✅ `components/period_selector.py`：mode 单选 + 周期下拉（周期选项从 `xcpc_core.utils.calendar` 取）
-6. ⬜ 筛选条件同步 URL query（`on_load` 读 `self.router.page.params`，事件里 `rx.redirect` 带参）
+6. ✅ 筛选条件同步 URL query（2026-09-11）：`BoardState.on_load` 从 `router.page.params` 恢复 mode/period_type/period_id/search（非法值忽略回落默认）；`set_*_sync_url` 事件经 `rx.redirect(path, replace=True)` 写回 URL，默认值参数不进 URL 保持地址干净；`set_sort` 暂不进 URL（排序属个人视图偏好）；回归测试 `tests/test_board_url_sync.py`（10 条）
 7. ✅ `status=left` 不显示；`retired` 显示退役标记（[08](08-前端与Web交互模块.md) §4.1）
 
-验收：浏览器看到 21 行真实榜单；切换 mode/周期/搜索均实时生效；刷新带参 URL 状态保持（URL 同步待完善）。
+验收：浏览器看到 21 行真实榜单；切换 mode/周期/搜索均实时生效；刷新带参 URL 状态保持（URL 同步 ✅ 2026-09-11，`tests/test_board_url_sync.py`）。
 **此 Part 完成即一期关闭**（更新 [13](./13-实施路线图.md) 与根 PROGRESS.md）。
 
 ### P2 · 认证底座 ✅（2026-08-20）
@@ -132,13 +132,13 @@ admin-only 字段只读展示并注明原因。
 
 验收：删除比赛后榜单与成绩消失；审计可按 user/action 筛出绑定审批与 CRUD 记录。✅ 已完成；新增 6 条 Web 回归测试，core 73 + web 60（总计 133）全绿，Reflex production frontend export 通过。
 
-### P4d · `/admin/import` 在线导入五步 ✅（Web 集成完成，2026-08-25）
+### P4d · `/admin/import` 在线导入五步 ✅（Web 集成 2026-08-25，验收通过 2026-09-10）
 
 任务：上传 → 填元信息（`contest_id`/日期/`contest_type`）→ 解析预览（队数/本校/奖牌线）→ 未匹配项人工决策（新建选手 or 指定现存）→ 确认写入。解析结果先落 `ImportBatch(status=staged)`，确认才写正式表；长解析 `@rx.event(background=True)` 不进写事务（[08](./08-前端与Web交互模块.md) §4.4、[12](./12-开发流程建议.md) §8）。写 `import.confirm` 审计。
 
 实现：新增 staged importer API（`stage_formal_xlsx` / `confirm_import_batch` / `discard_import_batch`），并接入 `/admin/import`。上传文件使用安全临时路径，确认、取消及重新上传时清理；解析阶段不创建正式 Player / Team / Contest，确认阶段以单个 core DB transaction 写入，提交成功后再归档 raw JSON。
 
-验证：真实省赛 xlsx 已走通 staged → confirmed 全流程（解析 312 支队伍、6 条正式成绩、18 个未匹配选手）；core + web 共 138 条测试通过，Reflex frontend export 通过。浏览器手工验收仍待在可绑定端口的运行环境中完成；在此之前三期保持“收尾”状态。
+验证：真实省赛 xlsx 已走通 staged → confirmed 全流程（解析 312 支队伍、6 条正式成绩、18 个未匹配选手）；core + web 共 138 条测试通过，Reflex frontend export 通过。浏览器手工验收已于 2026-09-10 由管理员完成，全程未发现问题，三期关闭。
 
 ### P5 · 详情页与图表
 
@@ -171,4 +171,4 @@ admin-only 字段只读展示并注明原因。
 
 ---
 
-*文档版本：v1.6 — 二期已完成（2026-08-20），三期 P4a–P4d Web 集成已完成（2026-08-25），待浏览器手工验收后关闭三期。*
+*文档版本：v1.8 — P1 任务 6（筛选同步 URL query）完成（2026-09-11）。*
