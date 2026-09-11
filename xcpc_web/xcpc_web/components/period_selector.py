@@ -15,7 +15,7 @@ def period_selector() -> rx.Component:
                 rx.select.item("仅正式赛", value="formal_only"),
             ),
             value=BoardState.mode,
-            on_change=BoardState.set_mode,
+            on_change=BoardState.set_mode_sync_url,
             width="150px",
         ),
         # 周期类型选择
@@ -27,14 +27,14 @@ def period_selector() -> rx.Component:
                 rx.select.item("赛季", value="season"),
             ),
             value=BoardState.period_type,
-            on_change=lambda value: BoardState.set_period(value),
+            on_change=lambda value: BoardState.set_period_sync_url(value),
             width="120px",
         ),
         # 搜索框
         rx.input(
             placeholder="搜索选手ID或姓名",
             value=BoardState.search,
-            on_change=BoardState.set_search,
+            on_change=BoardState.set_search_sync_url,
             width="200px",
         ),
         spacing="3",
