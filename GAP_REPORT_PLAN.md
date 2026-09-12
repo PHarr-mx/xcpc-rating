@@ -129,11 +129,9 @@ CONTEXT.md 自评：整体进度约 55–60%，「分水岭在四期」。
 
 ### F. 工程健壮性（不影响功能演示，但影响正确性/演进）
 
-#### ⑪ `meta.data_version` 无自动 bump，榜单缓存失效靠手动
-- **现状**：board 缓存 key 含 data_version，失效设计上依赖写路径 bump `meta.data_version`，但 core 内**没有任何 bump 实现**；cache 有手动 `invalidate()`，未见调用链闭环。
-- **证据**：`xcpc_core/board/api.py:34-39`（读 meta 单行）、`:72-88`（进程内 dict 缓存，上限 256）、`:52-54`（`invalidate()`）；grep core 无更新 Meta 行的代码；board/tests 锁定算法版本 `"placeholder_v0"`（test_board.py:97）。
-- **影响**：导入/CRUD 写库后若进程未重启也未手动 invalidate，同进程内榜单可能返回陈旧数据（当前靠开发习惯规避）。注意：这是**代码层新发现**，docs 未记载。
-- **范围估算**：小。在 importer confirm / contest 删除等写路径统一 bump（或统一调 invalidate）+ 测试。
+#### ⑪ `meta.data_version` 无自动 bump，榜单缓存失效靠手动 ✅ 已完成（2026-09-11）
+- **原状**：board 缓存 key 含 data_version，失效设计上依赖写路径 bump `meta.data_version`，但 core 内没有任何 bump 实现，`invalidate()` 也无调用方——缓存 key 永远不变，进程存活期间榜单页持续命中旧快照（代码层新发现，docs 未记载）。
+- **闭环**：2026-09-11 实现——新增 `xcpc_core/db/meta.py` 的 `bump_data_version(session)`（只 flush 不 commit，随调用方事务原子提交/回滚）；player service 的 create/update/delete 与 contest service 的 save/delete 在业务写前调用（importer 确认、一步式导入、补队经这两个 service 自动覆盖；CLI 与 Web 同享）。`invalidate()` 保留为手动兜底。新增回归测试 `xcpc_core/tests/test_data_version_bump.py`（7 条，含端到端缓存失效链路）；core 84 + web 78 全绿。本项从缺失清单移除，此处保留作评审记录。
 
 #### ⑫ alembic 迁移未引入
 - **现状**：schema 演进靠 create_all + 一次性 migrate 脚本。
@@ -200,8 +198,8 @@ CONTEXT.md 自评：整体进度约 55–60%，「分水岭在四期」。
 
 **第一步 · 零依赖小项（可立即开工，互不阻塞）**
 
-1. **URL query 同步（②）**：`/` 榜单筛选写回 URL，分享链接 / 刷新后状态保持。
-2. **data_version 自动 bump（⑪）**：导入确认、比赛删除等写路径统一 bump `meta.data_version`（或统一调 `invalidate()`），补回归测试。建议最先做——在线导入已在三期投产使用。
+1. **URL query 同步（②）** ✅ 已完成（2026-09-11）。
+2. **data_version 自动 bump（⑪）** ✅ 已完成（2026-09-11）：`db/meta.py` + player/contest service 写路径接线 + 7 条回归测试。
 3. **`/about` 静态页（⑦ 的一部分）**：无数据依赖，可随手先上。
 
 **第二步 · P5 详情页主体**

@@ -3,8 +3,9 @@
 - ``board()``：计算一个 mode × period 组合的榜单快照。
 - 缓存：缺省数据源路径按 ``(mode, period, data_version)`` 进程内缓存（上限 256 条）；
   注入 ``session``（测试 / 自定义数据源）时**不走缓存**，保证测试隔离。
-- 写操作（改选手 / 导比赛 / 调权重）后应调用 ``invalidate()``，或按 docs/06 §3
-  由写路径 bump ``meta.data_version`` 令缓存自然失效。
+- 缓存失效：写路径（player / contest service 的写方法、importer 确认）已统一在
+  提交前调用 ``xcpc_core.db.meta.bump_data_version``，业务提交后缓存按新版本号
+  自然失效。``invalidate()`` 保留为手动兜底（如外部工具直改库后）。
 """
 
 from __future__ import annotations

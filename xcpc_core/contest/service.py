@@ -5,6 +5,7 @@ from datetime import date
 from xcpc_core.contest.exceptions import ContestNotFoundError
 from xcpc_core.contest.models import Contest, ContestCreate, ContestDetail
 from xcpc_core.contest.store import ContestStore
+from xcpc_core.db.meta import bump_data_version
 from xcpc_core.utils.calendar import competition_year, season_label
 
 
@@ -31,6 +32,7 @@ class ContestService:
             weight_source=data.weight_source,
             source_file=data.source_file,
         )
+        bump_data_version(self.store.session)
         if self.store.get(data.id) is None:
             self.store.insert(contest, data.standings, commit=commit)
         else:
@@ -47,4 +49,7 @@ class ContestService:
         return self.store.list_all(source_type=source_type)
 
     def delete_contest(self, contest_id: str) -> None:
+        if self.store.get(contest_id) is None:
+            return
+        bump_data_version(self.store.session)
         self.store.delete(contest_id)

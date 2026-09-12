@@ -11,6 +11,7 @@ from xcpc_core.player.exceptions import (
 )
 from xcpc_core.player.models import Player, PlayerCreate, PlayerStatus, PlayerUpdate
 from xcpc_core.player.store import PlayerStore
+from xcpc_core.db.meta import bump_data_version
 
 _UNIQUE_VIOLATION_MSG = "校内 handle 或 OJ 账号与他人重复"
 
@@ -79,6 +80,7 @@ class PlayerService:
             aliases=data.aliases,
             created_at=today,
         )
+        bump_data_version(self.store.session)
         try:
             self.store.insert(player, commit=commit)
         except IntegrityError as exc:
@@ -104,6 +106,7 @@ class PlayerService:
             update={key: getattr(data, key) for key in data.model_fields_set}
         )
         updated.updated_at = today
+        bump_data_version(self.store.session)
         try:
             self.store.update(updated)
         except IntegrityError as exc:
@@ -112,6 +115,9 @@ class PlayerService:
 
     def delete_player(self, player_id: str, *, today: date | None = None) -> Player:
         today = today or date.today()
+        if self.store.get(player_id) is None:
+            raise PlayerNotFoundError(player_id)
+        bump_data_version(self.store.session)
         removed = self.store.delete(player_id)
         if removed is None:
             raise PlayerNotFoundError(player_id)
