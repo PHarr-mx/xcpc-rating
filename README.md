@@ -3,7 +3,7 @@
 校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。
 
 > **技术路线（已采纳）**：Reflex（Python 全栈 Web）+ SQLite + Caddy 反向代理。
-> 原 Vue 3 静态站方案已废弃。实施计划见 [docs/13-实施路线图.md](docs/13-实施路线图.md)。
+> 原 Vue 3 静态站方案已废弃。进度与剩余工作见 [docs/08-路线图.md](docs/08-路线图.md)。
 
 ## 目录
 
@@ -17,23 +17,18 @@
 
 ## 文档
 
+入口：[docs/README.md](docs/README.md)（文档地图 + 模块实现状态总览）。
+
 | 文档 | 说明 |
 |------|------|
-| [docs/DESIGN.md](docs/DESIGN.md) | 工程架构总览（已采纳 Reflex + SQLite） |
-| [docs/01-开发环境与工程结构.md](docs/01-开发环境与工程结构.md) | 目标工程结构、分层规则、迁移对应 |
-| [docs/03-比赛与记录模块.md](docs/03-比赛与记录模块.md) | 正式赛 / 训练赛 / OJ 三类数据源定义 |
-| [docs/04-数据导入与加工模块.md](docs/04-数据导入与加工模块.md) | raw → SQLite 导入、Web 交互式导入 |
-| [docs/05-数据导出与发布模块.md](docs/05-数据导出与发布模块.md) | 可选只读导出 / 备份 |
-| [docs/06-Rating计算模块.md](docs/06-Rating计算模块.md) | Rating 引擎（基类 + 继承体系） |
-| [docs/07-榜单模块.md](docs/07-榜单模块.md) | 双榜模式、时间维度、排名规则 |
-| [docs/08-前端与Web交互模块.md](docs/08-前端与Web交互模块.md) | Reflex State / 路由 / 页面 |
-| [docs/09-认证与权限模块.md](docs/09-认证与权限模块.md) | 角色、用户↔选手绑定、字段级权限 |
-| [docs/10-数据存储与SQLite.md](docs/10-数据存储与SQLite.md) | SQLite 表结构、迁移、运维 |
-| [docs/11-部署与运维.md](docs/11-部署与运维.md) | Caddy / systemd / 备份 |
-| [docs/12-开发流程建议.md](docs/12-开发流程建议.md) | 开发手册：环境、约定、避坑 |
-| [docs/13-实施路线图.md](docs/13-实施路线图.md) | 五期实施计划 |
-| [docs/14-Web开发拆分计划.md](docs/14-Web开发拆分计划.md) | Web 开发拆分与执行指南 |
-| [docs/skills.md](docs/skills.md) | AI Agent Skills |
+| [docs/01-架构与数据流.md](docs/01-架构与数据流.md) | 架构、分层规则、SQLite 表与并发运维、配置文件 |
+| [docs/02-选手与队伍.md](docs/02-选手与队伍.md) | Player / Team 模型、状态机、API 与 CLI |
+| [docs/03-比赛与导入.md](docs/03-比赛与导入.md) | 三类数据源；正式赛导入全链路；训练赛/OJ 待建 |
+| [docs/04-Rating与榜单.md](docs/04-Rating与榜单.md) | 事件模型、计算器体系、placeholder 现状、榜单与缓存 |
+| [docs/05-Web与认证.md](docs/05-Web与认证.md) | Reflex 分层、路由与页面、认证与权限、Web 测试基建 |
+| [docs/06-部署与运维.md](docs/06-部署与运维.md) | Caddy / systemd / 备份（五期待建） |
+| [docs/07-开发流程.md](docs/07-开发流程.md) | 开发手册：环境、约定、避坑、Agent 协作 |
+| [docs/08-路线图.md](docs/08-路线图.md) | 里程碑状态、剩余工作、待定决策 |
 
 ## 环境
 
@@ -82,9 +77,8 @@ cd xcpc_web && ../.venv/bin/reflex run
 
 ## 实施状态
 
-当前完成：选手/队伍 CRUD、正式赛 xlsx 导入（JSON 数据层）。  
-**P0 Reflex 骨架** 已就绪（`xcpc_web/`），榜单页（P1）待开发。
+已完成：选手/队伍 CRUD、正式赛导入（CLI + Web 五步 staged）、认证与绑定审批、管理后台、榜单页（Rating 公式为 placeholder_v0）。
 
-按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 推进五期改造：
-`pyproject 打包 → Reflex 骨架 → 认证 → 管理后台 → Rating 计算 → 上线`。
-开发指引见 [docs/12-开发流程建议.md](docs/12-开发流程建议.md)。
+待建：Rating 正式公式（四期）、训练赛/OJ 数据源、选手/比赛详情页、权重试算页、部署上线（五期）。
+
+剩余工作与待定决策见 [docs/08-路线图.md](docs/08-路线图.md)；开发指引见 [docs/07-开发流程.md](docs/07-开发流程.md)。

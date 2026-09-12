@@ -22,7 +22,7 @@ description: >-
 |-----------------|------|------|
 | `xcpcio_xlsx` | XCPC.io 导出 `.xlsx` | `xcpc_core.importer.import_formal_xcpcio_xlsx` |
 
-详细字段说明见 [docs/04-数据导入与加工模块.md](../../docs/04-数据导入与加工模块.md) §4。导入流程与 Web 交互式导入见同文档 §5。
+详细字段说明见 [docs/03-比赛与导入.md](../../docs/03-比赛与导入.md) §2.6。导入链路与 Web 五步 staged 见同文档 §2。
 
 ## 工作流
 

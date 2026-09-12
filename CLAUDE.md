@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），已实现选手/队伍 CRUD、正式赛导入、contest 与 rating 模块（placeholder 公式）、board 榜单聚合；Reflex 前端为下一步。
+校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），Web 为 **Reflex 全栈**（`xcpc_web/`，锁 0.9.7）。已实现：选手/队伍 CRUD、正式赛导入（CLI 一步式 + Web 五步 staged）、认证与绑定审批、管理后台 7 页、榜单页（Rating 公式为 placeholder_v0，数值无业务含义）。
 
-技术栈：Python 3.13、pydantic v2、openpyxl、PyYAML、SQLAlchemy 2.0。原始数据以 JSON 存于 `data/raw/`（逐字可 diff、可进 Git，import 后写回归档），运行时数据在 SQLite（`data/db/xcpc.db`）。
+技术栈：Python 3.13、pydantic v2、openpyxl、PyYAML、SQLAlchemy 2.0。原始数据以 JSON 存于 `data/raw/`（逐字可 diff、可进 Git，import 后写回归档），运行时数据在 SQLite（`data/db/xcpc.db` 业务 + `data/db/xcpc_web.db` 认证）。
 
-> Reflex + SQLite 方案**已采纳**（`docs/DESIGN.md` v4.0）。按 [docs/13-实施路线图.md](docs/13-实施路线图.md) 已完成一期「地基」：打包、建表、JSON 一次性迁移、contest/rating 模块、board 榜单聚合。剩余：Reflex 骨架（一期收官）、认证、管理后台等。新开发按目标结构规划。
+> Reflex + SQLite 方案已采纳并落地。里程碑：一期（地基）、二期（认证）、三期（管理后台）已完成；四期（Rating 真实公式 + 训练赛）、五期（部署上线）未开始。**当前进度与剩余工作以 [docs/08-路线图.md](docs/08-路线图.md) 为准。**
 
 ## 常用命令
 
@@ -55,16 +55,17 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 
 ## Web 开发
 
-Reflex 骨架已创建（`xcpc_web/`，锁版本 0.9.7），一期收官项为榜单页 `/`（P1）。
+Reflex 应用完整运行中（`xcpc_web/`，锁版本 0.9.7）：榜单页、认证、`/profile`、管理后台 7 页（选手/队伍/比赛/用户审批/审计/在线导入）、`/about`。
 
 开发命令：
 
 ```bash
 uv sync --extra web                    # 安装 reflex 及组件分包
 cd xcpc_web && ../.venv/bin/reflex run # 启动开发服务器（端口 3000）
+cd xcpc_web && ../.venv/bin/python -m pytest tests -v   # web 测试单独跑
 ```
 
-详见 [docs/14-Web开发拆分计划.md](docs/14-Web开发拆分计划.md)。
+详见 [docs/05-Web与认证.md](docs/05-Web与认证.md)。
 
 ## 架构总览
 
@@ -126,7 +127,11 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
 
 ## 文档与实现状态
 
-- `docs/` 是**已采纳设计**：`DESIGN.md` 为架构总览（Reflex + SQLite），`01` 工程结构，`03`–`11` 业务模块设计，`12` 开发流程建议，`13` 实施路线图。
-- **已实现**：SQLite 持久化（`xcpc_core/db/`，表结构见 `10`）、选手/队伍 CRUD、正式赛导入（raw+DB 双写）、contest 模块（`03`）、rating 引擎（`06`，placeholder 公式）、board 榜单聚合（`07`，含 data_version 缓存）。**设计蓝图**：Reflex 前端（`08`）、认证（`09`）、部署（`11`）。
-- 原 Vue 静态站方案与 Reflex 提案文档已删除（留 Git 历史）。
-- `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流建议见 `docs/12-开发流程建议.md`。
+- `docs/`（v2，2026-09-11 重构）共 9 篇，入口为 [docs/README.md](docs/README.md)：
+  - **参考**（描述已实现系统，含代码路径）：`01-架构与数据流`、`02-选手与队伍`、`03-比赛与导入`（formal 部分）、`04-Rating与榜单`（骨架部分）、`05-Web与认证`（已上线部分）
+  - **待建**（设计已定、代码未写）：`03`（训练赛/OJ）、`04`（正式公式）、`05`（详情页/P6）、`06-部署与运维`
+  - **指南/计划**：`07-开发流程`（含避坑清单）、`08-路线图`（进度与剩余工作权威来源）
+- **已实现**：SQLite 持久化（16 张表）、选手/队伍 CRUD、正式赛导入全链路、rating 引擎骨架（placeholder_v0）、board 榜单聚合（写路径自动 bump data_version）、Reflex 全部已上线页面、认证与三层权限守卫。
+- **未实现**：Rating 正式公式、训练赛录入、OJ 数据源（三表零代码）、选手/比赛详情页、权重试算页、部署上线。
+- 原 Vue 静态站方案、v1 版 docs（DESIGN + 01–14）已删除（留 Git 历史）。
+- `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流与避坑见 `docs/07-开发流程.md`。
