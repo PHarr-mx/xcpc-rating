@@ -98,8 +98,10 @@ BoardSnapshot(
 - 离队（`left`）选手不出现在榜单；退役（`retired`）保留；年级展示用入学年（`grade=0` 显示「未设置」）
 - 生成时间等 meta 展示在榜单页脚（含 data_version，供确认数据新鲜度）
 
-**选手历史（rating_history）**：设计为按时间序的 Rating 变动记录（日期、前后分、delta、来源比赛），
-当前引擎可按选手聚合得分序列，但**对外查询接口未建**——随选手详情页（P5）实现。
+**选手历史（rating_history）**：`rating.api.player_event_history(player_id, mode=, session=)`（✅ 2026-09-11，P5）
+返回 `PlayerEventRecord` 列表——按 (date, event_id) 升序的逐场记录（比赛、名次/解题、贡献）+ 逐场累计
+`rating_after`（与榜单 placeholder 聚合语义一致）；测试注入用 `configure_session`（DI 镜像 importer/audit）。
+选手详情页消费；OJ/训练赛事件就绪后自动纳入。
 
 ## 7. 缓存与失效（已实装）
 

@@ -43,7 +43,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `/admin/contests` | 比赛列表与删除 | admin | ✅ |
 | `/admin/audit` | 审计日志筛选（只读） | admin | ✅ |
 | `/admin/import` | xlsx 在线导入五步 | admin | ✅ |
-| `/players/{player_id}` | 选手详情 | guest | ⬜ |
+| `/players/{player_id}` | 选手详情：档案 + OJ 外链 + Rating 曲线 + 参赛记录；绑定本人显示「编辑我的资料」 | guest | ✅ 2026-09-11 |
 | `/contests/{contest_id}` | 比赛详情（formal/training 同页按 format 切列） | guest | ⬜ |
 | `/admin/rating` | 权重试算 | admin | ⬜（P6，前置四期公式） |
 
@@ -58,7 +58,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `ProfileState` | 自助改资料、OJ 账号、绑定申请 | ✅ |
 | `AdminState`（基类） | 权限守卫 `_require_admin()` | ✅ |
 | `AdminOverview/Users/Players/Teams/Contests/Audit/ImportState` | 管理后台各页 | ✅ |
-| `PlayerDetailState` / `ContestDetailState` | 详情页 | ⬜ |
+| `PlayerDetailState` / `ContestDetailState` | 详情页（选手 ✅ 2026-09-11；比赛 ⬜） | 🔨 |
 | `RatingLabState` | 权重试算（draft_weights / preview_rows / diff_vs_current） | ⬜ |
 
 `BoardState` 要点：mode/period_type/period_id/search/sort_by；`@rx.var(cache=True)` 调 `board_api.board()`；
@@ -77,13 +77,15 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 
 | 项 | 设计要点 |
 |----|----------|
-| `/players/{id}` | 基本信息 + OJ 账号 + 参赛记录 Tab（正式/训练/OJ）+ Plotly Rating 曲线（按 mode 过滤，超 500 点按赛年聚合）；绑定本人时右上角「编辑我的资料」入口 |
-| `/contests/{id}` | 比赛详情，formal/training 同页按 `format` 切列 |
-| `standings_table.py` | 成绩表组件，按 format 切列 |
-| `oj_link.py` | 平台 profile 外链，URL 模板集中在 config |
-| `form_fields.py` | 表单控件 + 错误提示 |
-| `rating_chart.py` | Plotly 折线（曲线在真实公式落地前可展示 placeholder 数据） |
-| `/admin/rating` | 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump data_version + 记 `weights.apply` 审计 |
+| `/players/{id}` ✅ | 基本信息 + OJ 账号外链（`config.py` 模板）+ 参赛记录表 + Rating 累计曲线；`is_self` 由路由参数与服务端 bound_player_id 比对，绑定本人显示「编辑我的资料」；404 兜底 |
+| `/contests/{id}` | 比赛详情，formal/training 同页按 `format` 切列（⬜） |
+| `standings_table.py` | 成绩表组件，按 format 切列（⬜，随比赛详情页） |
+| `oj_link.py` ✅ | 平台 profile 外链；URL 与展示文案在 State 侧预算成视图 dict（Var 不能构建期逐项分支；url 空串表示无链，避免 rx.cond 分支构建期 href=None 报错） |
+| `form_fields.py` | 表单控件 + 错误提示（⬜） |
+| `rating_chart.py` ✅ | Rating 累计折线。**用 Reflex 内置 recharts 替代原计划的 plotly**——单折线场景够用、零新增依赖、无产物体积负担 |
+| `/admin/rating` | 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump data_version + 记 `weights.apply` 审计（⬜） |
+
+动态路由要点：`route="/players/[player_id]"`；参数运行时合并进 `router.page.params`（与 query 同通道），`on_load` 读取；`is_self` 直接读路由参数不依赖 on_load 时序。
 
 **错误与加载态**：数据加载 `rx.skeleton`；资源不存在 404 + 返回榜单；表单校验失败展示 core 异常消息（字段级）；WebSocket 断开用 Reflex 内置重连。**性能**：校内规模全量渲染一次即可，超 2000 行再考虑虚拟滚动；Plotly 仅详情页引入。
 

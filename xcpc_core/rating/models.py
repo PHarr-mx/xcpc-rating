@@ -54,3 +54,23 @@ class RatingResult(BaseModel):
     mode: BoardMode = "all"
     period: PeriodFilter
     scores: list[PlayerScore]  # 按 rating 降序，同分按 player_id
+
+
+class PlayerEventRecord(BaseModel):
+    """选手个人页的参赛记录：一次事件 + 逐场累计 Rating（现公式下为得分累加）。"""
+
+    event_id: str
+    contest_id: str
+    contest_title: str | None = None
+    date: date
+    source_type: SourceType
+    contest_type: str | None = None
+    contest_format: str | None = None
+    team_id: str | None = None
+    rank: int | None = None
+    solved: int | None = None
+    penalty: int | None = None
+    score: int | None = None  # oi 用的题目分值，与 contribution（rating 贡献）区分
+    award: str | None = None
+    contribution: float  # 本场对 rating 的贡献（已含权重）
+    rating_after: float  # 按日期升序累计到本场后的 rating

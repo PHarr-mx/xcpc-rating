@@ -51,6 +51,7 @@ from xcpc_core.team import api as team_api  # noqa: E402
 from xcpc_core.team.store import TeamStore  # noqa: E402
 from xcpc_core.audit import api as audit_api  # noqa: E402
 from xcpc_core.importer import api as importer_api  # noqa: E402
+from xcpc_core.rating import api as rating_api  # noqa: E402
 
 from xcpc_web.states.auth import AuthState  # noqa: E402
 from xcpc_web.states.auth_models import BindingRequest, UserProfile  # noqa: E402, F401
@@ -89,6 +90,7 @@ def core_store():
     contest_api.configure_store(ContestStore(session))
     audit_api.configure_session(session)
     importer_api.configure_session(session)
+    rating_api.configure_session(session)
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
@@ -96,6 +98,7 @@ def core_store():
     contest_api.configure_store(None)  # type: ignore[arg-type]
     audit_api.configure_session(None)  # type: ignore[arg-type]
     importer_api.configure_session(None)
+    rating_api.configure_session(None)
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()

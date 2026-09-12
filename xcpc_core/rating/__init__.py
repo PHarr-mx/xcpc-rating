@@ -1,4 +1,4 @@
-from xcpc_core.rating.api import compute_rating
+from xcpc_core.rating.api import compute_rating, player_event_history
 from xcpc_core.rating.calculators import (
     BaseRatingCalculator,
     FormalCalculator,
@@ -14,6 +14,7 @@ from xcpc_core.rating.events import build_events_from_contests
 from xcpc_core.rating.models import (
     EventScore,
     PeriodFilter,
+    PlayerEventRecord,
     PlayerScore,
     RatingEvent,
     RatingResult,
@@ -26,6 +27,7 @@ __all__ = [
     "OjContestCalculator",
     "OjPracticeCalculator",
     "PeriodFilter",
+    "PlayerEventRecord",
     "PlayerScore",
     "RatingEngine",
     "RatingEvent",
@@ -36,4 +38,5 @@ __all__ = [
     "TrainingTeamXcpcCalculator",
     "build_events_from_contests",
     "compute_rating",
+    "player_event_history",
 ]
