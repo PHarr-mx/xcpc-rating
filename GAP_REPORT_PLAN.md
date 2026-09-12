@@ -97,13 +97,13 @@ CONTEXT.md 自评：整体进度约 55–60%，「分水岭在四期」。
 - **影响**：选手 Rating 随时间变化不可视化（依赖 ③ 之后数据才有意义）。
 - **范围估算**：中。组件 + 依赖 ⑦ 的详情页挂载点。
 
-### C. P5 详情页与组件（docs/14 P5，未开始）
+### C. P5 详情页与组件（docs/14 P5，部分完成）
 
-#### ⑦ 三个详情页 + 三个组件
-- **现状**：`/players/{id}`、`/contests/{id}`、`/about` 三条路由及配套组件 `standings_table.py`（按 format 切列成绩表）、`oj_link.py`（OJ 外链）、`form_fields.py`（表单控件）在代码中均不存在。
-- **证据**：docs/14 P5 无状态标记（未开始）；代码核实 `xcpc_web/pages/` 仅 index/login/register/profile/admin×7，components/ 仅 layout、board_table、period_selector。
+#### ⑦ 详情页 + 组件（/about 已完成，其余未开始）
+- **现状**：`/about` 静态页 ✅（2026-09-11）；`/players/{id}`、`/contests/{id}` 两条路由及配套组件 `standings_table.py`（按 format 切列成绩表）、`oj_link.py`（OJ 外链）、`form_fields.py`（表单控件）在代码中均不存在。
+- **证据**：docs/14 P5 无状态标记（部分推进中）；代码核实 `xcpc_web/pages/` 仅 index/login/register/profile/about/admin×7，components/ 仅 layout、board_table、period_selector。
 - **影响**：公开侧目前只有一张榜单总表；选手个人页（Rating 曲线、分 Tab 成绩、绑定本人后「编辑我的资料」入口）与比赛详情页（榜单系统面向「展示」的核心体验）缺失。
-- **范围估算**：中-大。三个页面 + 三个 State（PlayerDetailState/ContestDetailState 等）+ 组件；`/about` 为静态页可先行。core 侧预计仅需少量只读查询补充（如按选手聚合全部事件、按比赛取 standings 展示形态）。
+- **范围估算**：中-大。两个页面 + 两个 State（PlayerDetailState/ContestDetailState）+ 组件；core 侧预计仅需少量只读查询补充（如按选手聚合全部事件、按比赛取 standings 展示形态）。
 
 ### D. 五期上线（未开始）
 
@@ -200,7 +200,7 @@ CONTEXT.md 自评：整体进度约 55–60%，「分水岭在四期」。
 
 1. **URL query 同步（②）** ✅ 已完成（2026-09-11）。
 2. **data_version 自动 bump（⑪）** ✅ 已完成（2026-09-11）：`db/meta.py` + player/contest service 写路径接线 + 7 条回归测试。
-3. **`/about` 静态页（⑦ 的一部分）**：无数据依赖，可随手先上。
+3. **`/about` 静态页（⑦ 的一部分）** ✅ 已完成（2026-09-11）：数据与赛季说明页 + 导航「关于」入口 + 冒烟测试。
 
 **第二步 · P5 详情页主体**
 

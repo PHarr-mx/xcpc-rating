@@ -12,6 +12,7 @@ def page_shell(*children) -> rx.Component:
         # 导航栏
         rx.hstack(
             rx.heading("XCPC Rating", size="6"),
+            rx.link("关于", href="/about", size="2"),
             rx.spacer(),
             rx.cond(
                 AuthState.is_authenticated,
