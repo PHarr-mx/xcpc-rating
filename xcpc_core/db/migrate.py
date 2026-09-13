@@ -35,9 +35,9 @@ def _load_json(path: Path) -> list[dict]:
     return data
 
 
-def migrate_players(session, *, today: date, plog: Plog) -> int:
+def migrate_players(session, *, today: date, plog: Plog, repo_root: Path) -> int:
     store = PlayerStore(session)
-    raw_items = _load_json(find_repo_root() / "data/raw/players/roster.json")
+    raw_items = _load_json(repo_root / "data/raw/players/roster.json")
     count = 0
     for item in raw_items:
         player = Player.model_validate(item)
@@ -52,9 +52,9 @@ def migrate_players(session, *, today: date, plog: Plog) -> int:
     return count
 
 
-def migrate_teams(session, *, today: date, plog: Plog) -> int:
+def migrate_teams(session, *, today: date, plog: Plog, repo_root: Path) -> int:
     store = TeamStore(session)
-    raw_items = _load_json(find_repo_root() / "data/raw/teams/roster.json")
+    raw_items = _load_json(repo_root / "data/raw/teams/roster.json")
     count = 0
     for item in raw_items:
         team = Team.model_validate(item)
@@ -69,8 +69,8 @@ def migrate_teams(session, *, today: date, plog: Plog) -> int:
     return count
 
 
-def migrate_formal_contests(session, *, plog: Plog) -> int:
-    raw_dir = find_repo_root() / "data/raw/formal"
+def migrate_formal_contests(session, *, plog: Plog, repo_root: Path) -> int:
+    raw_dir = repo_root / "data/raw/formal"
     files = sorted(raw_dir.glob("*.json")) if raw_dir.is_dir() else []
     store = ContestStore(session)
     count = 0
@@ -121,9 +121,9 @@ def migrate(*, repo_root: Path | None = None) -> None:
     try:
         today = date.today()
         with factory() as session:
-            n_players = migrate_players(session, today=today, plog=plog)
-            n_teams = migrate_teams(session, today=today, plog=plog)
-            n_contests = migrate_formal_contests(session, plog=plog)
+            n_players = migrate_players(session, today=today, plog=plog, repo_root=root)
+            n_teams = migrate_teams(session, today=today, plog=plog, repo_root=root)
+            n_contests = migrate_formal_contests(session, plog=plog, repo_root=root)
         plog.info("迁移完成", players=n_players, teams=n_teams, contests=n_contests)
     finally:
         plog.close()

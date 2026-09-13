@@ -3,7 +3,7 @@
 只读聚合；数值计算复用 rating 引擎的事件得分序列。
 """
 
-from xcpc_core.board.api import board, invalidate
+from xcpc_core.board.api import available_periods, board, invalidate
 from xcpc_core.board.models import BoardMeta, BoardRow, BoardSnapshot
 from xcpc_core.board.service import BoardService, period_label
 
@@ -12,6 +12,7 @@ __all__ = [
     "BoardRow",
     "BoardService",
     "BoardSnapshot",
+    "available_periods",
     "board",
     "invalidate",
     "period_label",

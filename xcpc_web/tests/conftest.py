@@ -50,6 +50,7 @@ from xcpc_core.contest.store import ContestStore  # noqa: E402
 from xcpc_core.team import api as team_api  # noqa: E402
 from xcpc_core.team.store import TeamStore  # noqa: E402
 from xcpc_core.audit import api as audit_api  # noqa: E402
+from xcpc_core.board import api as board_api  # noqa: E402
 from xcpc_core.importer import api as importer_api  # noqa: E402
 from xcpc_core.rating import api as rating_api  # noqa: E402
 
@@ -91,6 +92,7 @@ def core_store():
     audit_api.configure_session(session)
     importer_api.configure_session(session)
     rating_api.configure_session(session)
+    board_api.configure_session(session)
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
@@ -99,6 +101,7 @@ def core_store():
     audit_api.configure_session(None)  # type: ignore[arg-type]
     importer_api.configure_session(None)
     rating_api.configure_session(None)
+    board_api.configure_session(None)
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()

@@ -25,6 +25,7 @@ class BoardState(rx.State):
 
     rows: list[dict] = []
     meta: dict | None = None
+    period_options: list[dict] = []  # 具体周期下拉选项（board_api.available_periods）
 
     def _get_period_filter(self) -> PeriodFilter:
         return PeriodFilter(
@@ -120,10 +121,11 @@ class BoardState(rx.State):
         self.load_board()
 
     def on_load(self):
-        """页面加载：先从 URL query 恢复筛选状态（非法值忽略），再渲染榜单。
+        """页面加载：加载周期选项，再从 URL query 恢复筛选状态（非法值忽略），渲染榜单。
 
         写回 URL 交给各 set_* 事件（返回值即事件，与原行为兼容）。
         """
+        self.period_options = board_api.available_periods()
         params = self.router.page.params
         mode = params.get("mode")
         if mode in _VALID_MODES:
@@ -137,6 +139,24 @@ class BoardState(rx.State):
                 self.period_id = raw_period_id
         self.search = params.get("search", "")
         self.load_board()
+
+    @rx.var(cache=False)
+    def period_value_label(self) -> str:
+        """当前周期在选项中的 label（select 绑定值；无匹配返回空串显示占位）。"""
+        for option in self.period_options:
+            if option["period_type"] == self.period_type and str(option["id"]) == str(self.period_id):
+                return option["label"]
+        return ""
+
+    def set_period_option_sync_url(self, label: str):
+        """UI 入口：按具体周期选项（label）设置周期并同步 URL。"""
+        option = next((o for o in self.period_options if o["label"] == label), None)
+        if option is None:
+            return
+        self.period_type = option["period_type"]
+        self.period_id = option["id"]
+        self.load_board()
+        return self._sync_url()
 
     def set_mode_sync_url(self, mode: str):
         """UI 入口：改 mode 并同步 URL。"""

@@ -18,17 +18,18 @@ def period_selector() -> rx.Component:
             on_change=BoardState.set_mode_sync_url,
             width="150px",
         ),
-        # 周期类型选择
+        # 具体周期下拉：生涯 / 2025赛年 / 2025-秋学期 …（选项来自数据覆盖范围）
         rx.select.root(
             rx.select.trigger(placeholder="选择周期"),
             rx.select.content(
-                rx.select.item("生涯", value="career"),
-                rx.select.item("赛年", value="competition_year"),
-                rx.select.item("赛季", value="season"),
+                rx.foreach(
+                    BoardState.period_options,
+                    lambda opt: rx.select.item(opt["label"], value=opt["label"]),
+                ),
             ),
-            value=BoardState.period_type,
-            on_change=lambda value: BoardState.set_period_sync_url(value),
-            width="120px",
+            value=BoardState.period_value_label,
+            on_change=BoardState.set_period_option_sync_url,
+            width="170px",
         ),
         # 搜索框
         rx.input(

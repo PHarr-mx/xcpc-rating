@@ -79,9 +79,11 @@ BaseRatingCalculator (ABC)                  compute() = base × weight / 100
 | 赛年 | `competition_year` | 当年 9/1 至次年 8/31（`2025赛年`） |
 | 赛季 | `season` | 秋学期（9–1 月）/ 寒假（2 月）/ 春学期（3–6 月）/ 暑假（7–8 月） |
 
-> **实现现状**：引擎过滤只按 `PeriodFilter.start/end` 生效；Web 端 `BoardState` 目前传
-> `type/id` 未换算成 start/end，赛年/赛季筛选**实际不改变结果集**（标签生效、过滤未接线）。
-> 这是四期接线项（`utils/calendar.py` 已具备换算所需的基础）。
+> **实现现状（✅ 2026-09-14 已接线）**：`PeriodFilter` 的 type+id 在模型层自动解析为
+> start/end（`utils/calendar.resolve_period_dates`；显式传入日期优先，无法解析则不过滤），
+> 引擎过滤、board meta、缓存 key 全部随之生效；周期下拉选项由
+> `board_api.available_periods()` 按数据覆盖范围生成（生涯 + 各赛年 + 四季）。
+> 手输 URL 的非法周期值回落为不过滤，与「非法值忽略」口径一致。
 
 ## 6. 榜单输出（BoardSnapshot）
 

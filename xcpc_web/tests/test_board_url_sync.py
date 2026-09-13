@@ -46,17 +46,18 @@ def _redirect_path(spec) -> str:
     raise AssertionError(f"no path in EventSpec args: {spec.args}")
 
 
-def test_on_load_default_without_query():
-    """无参数打开：全部默认值。"""
+def test_on_load_default_without_query(core_store):
+    """无参数打开：全部默认值；周期选项来自注入的（空）数据源。"""
     st = _make_board_state()
     st.on_load()
     assert st.mode == "all"
     assert st.period_type == "career"
     assert st.period_id is None
     assert st.search == ""
+    assert st.period_options == [{"key": "career", "period_type": "career", "id": None, "label": "生涯"}]
 
 
-def test_on_load_restores_from_query():
+def test_on_load_restores_from_query(core_store):
     """带参打开：筛选状态从 URL query 恢复。"""
     st = _make_board_state(
         {"mode": "formal_only", "period_type": "competition_year", "period_id": "2025", "search": "张"}
@@ -68,7 +69,7 @@ def test_on_load_restores_from_query():
     assert st.search == "张"
 
 
-def test_on_load_ignores_invalid_values():
+def test_on_load_ignores_invalid_values(core_store):
     """非法 mode/period_type 忽略；空白 period_id 忽略；未知参数不影响。"""
     st = _make_board_state(
         {"mode": "javascript:alert(1)", "period_type": "bogus", "period_id": "   ", "evil": "x"}
@@ -79,7 +80,7 @@ def test_on_load_ignores_invalid_values():
     assert st.period_id is None
 
 
-def test_on_load_ignores_period_id_on_career():
+def test_on_load_ignores_period_id_on_career(core_store):
     """career 下 period_id 无意义，不恢复。"""
     st = _make_board_state({"period_id": "2025"})
     st.on_load()
@@ -132,12 +133,46 @@ def test_set_search_sync_url_encodes_and_trims_default(core_store):
     assert _redirect_path(spec2) == "/"
 
 
-def test_set_period_non_sync_keeps_url_free():
+def test_set_period_non_sync_keeps_url_free(core_store):
     """直接调 set_period（无 _sync_url 后缀）不产生 redirect，供非 UI 调用。"""
     st = _make_board_state()
     st.set_period("competition_year", "2025")
     assert st.period_type == "competition_year"
     assert st.period_id == "2025"
+
+
+def test_period_option_handler(core_store):
+    """具体周期下拉：按 label 设置周期；career 选项复位 period_id；URL 同步。"""
+    st = _make_board_state()
+    st.on_load()
+    st.period_options = [
+        {"key": "career", "period_type": "career", "id": None, "label": "生涯"},
+        {"key": "competition_year:2025", "period_type": "competition_year", "id": "2025", "label": "2025赛年"},
+        {"key": "season:2025-秋学期", "period_type": "season", "id": "2025-秋学期", "label": "2025-秋学期"},
+    ]
+
+    spec = st.set_period_option_sync_url("2025赛年")
+    assert st.period_type == "competition_year"
+    assert st.period_id == "2025"
+    assert _redirect_path(spec) == "/?period_type=competition_year&period_id=2025"
+    assert st.period_value_label == "2025赛年"
+
+    spec2 = st.set_period_option_sync_url("2025-秋学期")
+    assert st.period_type == "season" and st.period_id == "2025-秋学期"
+    assert _redirect_path(spec2) == "/?period_type=season&period_id=2025-%E7%A7%8B%E5%AD%A6%E6%9C%9F"
+
+    spec3 = st.set_period_option_sync_url("生涯")
+    assert st.period_type == "career" and st.period_id is None
+    assert _redirect_path(spec3) == "/"
+    assert st.period_value_label == "生涯"
+
+
+def test_set_period_option_unknown_label_ignored(core_store):
+    st = _make_board_state()
+    st.on_load()
+    st.set_period_option_sync_url("不存在的选项")
+    assert st.period_type == "career"
+    assert st.period_id is None
 
 
 def test_board_url_roundtrip(core_store):
