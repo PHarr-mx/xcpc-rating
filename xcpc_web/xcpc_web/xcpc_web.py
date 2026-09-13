@@ -2,7 +2,8 @@ import reflex as rx
 import reflex_local_auth
 
 from xcpc_web.pages.about import about
-from xcpc_web.pages.admin.audit import admin_auditfrom xcpc_web.pages.admin.contests import admin_contests
+from xcpc_web.pages.admin.audit import admin_audit
+from xcpc_web.pages.admin.contests import admin_contests
 from xcpc_web.pages.admin.imports import admin_import
 from xcpc_web.pages.admin.overview import admin_overview
 from xcpc_web.pages.admin.players import admin_players

@@ -20,9 +20,12 @@ _STATUS_LABELS = {
 
 
 class PlayerDetailState(AuthState):
-    """选手详情：player 为视图 dict（含 grade_label/status_label），history 为逐场记录。"""
+    """选手详情：player 为视图 dict（含 grade_label/status_label），history 为逐场记录。
 
-    player_id: str = ""
+    路由参数 player_id 由 Reflex 动态路由自动注入（勿声明同名 var，会触发
+    DynamicRouteArgShadowsStateVarError）；统一从 router.page.params 读取。
+    """
+
     player: dict | None = None
     history: list[dict] = []
     not_found: bool = False
@@ -54,15 +57,15 @@ class PlayerDetailState(AuthState):
 
     def on_load(self) -> None:
         params = self.router.page.params
-        self.player_id = params.get("player_id", "")
+        player_id = params.get("player_id", "")
         self.player = None
         self.history = []
         self.not_found = False
-        if not self.player_id:
+        if not player_id:
             self.not_found = True
             return
         try:
-            player = player_api.get_player(self.player_id)
+            player = player_api.get_player(player_id)
         except PlayerNotFoundError:
             self.not_found = True
             return
@@ -77,7 +80,7 @@ class PlayerDetailState(AuthState):
         }
         self.history = [
             record.model_dump(mode="json")
-            for record in rating_api.player_event_history(self.player_id)
+            for record in rating_api.player_event_history(player_id)
         ]
 
     @staticmethod
