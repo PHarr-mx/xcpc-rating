@@ -40,7 +40,13 @@ def _records_table() -> rx.Component:
                 PlayerDetailState.history,
                 lambda r: rx.table.row(
                     rx.table.cell(r["date"]),
-                    rx.table.cell(rx.cond(r["contest_title"], r["contest_title"], r["contest_id"])),
+                    rx.table.cell(
+                        rx.link(
+                            rx.cond(r["contest_title"], r["contest_title"], r["contest_id"]),
+                            href=f"/contests/{r['contest_id']}",
+                            size="2",
+                        )
+                    ),
                     rx.table.cell(rx.cond(r["rank"], r["rank"], "—")),
                     rx.table.cell(
                         rx.cond(

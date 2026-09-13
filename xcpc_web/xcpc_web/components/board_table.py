@@ -24,13 +24,19 @@ def board_table() -> rx.Component:
                     lambda row: rx.table.row(
                         rx.table.cell(row["rank"]),
                         rx.table.cell(row["player_id"]),
-                        rx.table.cell(row["name"]),
+                        rx.table.cell(
+                            rx.link(
+                                row["name"],
+                                href=f"/players/{row['player_id']}",
+                                size="2",
+                            )
+                        ),
                         rx.table.cell(row["grade_label"]),
                         rx.table.cell(f'{row["rating"]:.1f}'),
                         rx.table.cell(row["event_count"]),
                         rx.table.cell(f'{row["delta_recent"]:.1f}'),
                     ),
-                ),
+                )
             ),
             width="100%",
         ),

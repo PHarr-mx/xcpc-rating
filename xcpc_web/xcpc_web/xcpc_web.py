@@ -9,6 +9,7 @@ from xcpc_web.pages.admin.overview import admin_overview
 from xcpc_web.pages.admin.players import admin_players
 from xcpc_web.pages.admin.teams import admin_teams
 from xcpc_web.pages.admin.users import admin_users
+from xcpc_web.pages.contest_detail import contest_detail
 from xcpc_web.pages.index import index
 from xcpc_web.pages.login import login
 from xcpc_web.pages.player_detail import player_detail
@@ -22,6 +23,7 @@ from xcpc_web.states.admin.players import AdminPlayersState
 from xcpc_web.states.admin.teams import AdminTeamsState
 from xcpc_web.states.admin.users import AdminUsersState
 from xcpc_web.states.board import BoardState
+from xcpc_web.states.contest_detail import ContestDetailState
 from xcpc_web.states.player_detail import PlayerDetailState
 from xcpc_web.states.profile import ProfileState
 
@@ -33,6 +35,12 @@ app.add_page(
     route="/players/[player_id]",
     title="选手详情",
     on_load=PlayerDetailState.on_load,
+)
+app.add_page(
+    contest_detail,
+    route="/contests/[contest_id]",
+    title="比赛详情",
+    on_load=ContestDetailState.on_load,
 )
 app.add_page(login, route=reflex_local_auth.routes.LOGIN_ROUTE, title="登录")
 app.add_page(register, route=reflex_local_auth.routes.REGISTER_ROUTE, title="注册")
