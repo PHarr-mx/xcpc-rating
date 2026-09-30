@@ -106,6 +106,8 @@ def admin_audit() -> rx.Component:
                             "team.update",
                             "team.delete",
                             "contest.delete",
+                            "points.approve",
+                            "points.reject",
                         ],
                         value=AdminAuditState.action_filter,
                         on_change=AdminAuditState.set_action_filter,

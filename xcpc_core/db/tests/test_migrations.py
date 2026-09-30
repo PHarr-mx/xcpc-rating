@@ -8,11 +8,12 @@ from __future__ import annotations
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 
 from xcpc_core.db import tables
 from xcpc_core.db.base import Base
-from xcpc_core.db.migrations import run_migrations
+from xcpc_core.db.migrations import make_alembic_config, run_migrations
 from xcpc_core.db.session import create_db_engine, make_session_factory
 
 
@@ -21,7 +22,13 @@ def db_url(tmp_path):
     return f"sqlite:///{tmp_path / 'xcpc.db'}"
 
 
-def _head_revision(engine) -> str | None:
+def _head_revision() -> str:
+    """迁移链的最新版本号（新迁移落地后无需改测试）。"""
+    script = ScriptDirectory.from_config(make_alembic_config())
+    return script.get_current_head()
+
+
+def _db_head_revision(engine) -> str | None:
     with engine.connect() as conn:
         if "alembic_version" not in inspect(conn).get_table_names():
             return None
@@ -41,7 +48,7 @@ def test_upgrade_head_on_fresh_db(db_url):
         names = set(inspect(engine).get_table_names())
         expected = {t.name for t in Base.metadata.sorted_tables}
         assert expected <= names
-        assert _head_revision(engine) == "0001_baseline"
+        assert _db_head_revision(engine) == _head_revision()
 
         with factory() as session:
             session.add(tables.Player(id="p001", name="张三"))
@@ -54,7 +61,7 @@ def test_upgrade_head_on_fresh_db(db_url):
     run_migrations(url=db_url)  # 已在 head：no-op，不报错
     engine = create_db_engine(url=db_url)
     try:
-        assert _head_revision(engine) == "0001_baseline"
+        assert _db_head_revision(engine) == _head_revision()
     finally:
         engine.dispose()
 
@@ -90,7 +97,7 @@ def test_legacy_db_stamped_and_idempotent(db_url):
 
     engine = create_db_engine(url=db_url)
     try:
-        assert _head_revision(engine) == "0001_baseline"
+        assert _db_head_revision(engine) == _head_revision()
         names = set(inspect(engine).get_table_names())
         assert names >= {"player", "meta", "alembic_version"}
     finally:

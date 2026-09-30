@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -19,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from xcpc_core.db.base import Base
@@ -219,4 +221,87 @@ class ImportBatch(Base):
     filename: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String)  # staged|confirmed|discarded
     payload_json: Mapped[str] = mapped_column(Text)  # 解析结果 + 未匹配项
+    created_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class PointsEvent(Base):
+    """积分场次配置（UCup 式单场分，RATING_FORMULA_PLAN.md §9）。
+
+    max_value / n_teams 为管理员配置的公式参数；审核通过时随流水快照，
+    事后改配置不溯及已记积分。
+    """
+
+    __tablename__ = "pointsevent"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    entity: Mapped[str] = mapped_column(String)  # player|team（认证主体）
+    kind: Mapped[str] = mapped_column(String)  # solved|score（value 语义：解题数/得分）
+    max_value: Mapped[int] = mapped_column(Integer)  # 全场最高解题数/得分
+    n_teams: Mapped[int] = mapped_column(Integer)  # 参赛实体数（队数/人数）
+    created_by: Mapped[int] = mapped_column(Integer)  # localuser.id
+    created_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class PointsClaim(Base):
+    """积分认证：staged → approved/rejected（与 ImportBatch/BindingRequest 同型）。
+
+    唯一性（部分唯一索引，见迁移）：个人赛 (event, player)、队伍赛 (event, team)
+    各只允许一条非 rejected 记录，service 层同时前置校验。
+    """
+
+    __tablename__ = "pointsclaim"
+    __table_args__ = (
+        Index(
+            "uq_pointsclaim_event_player",
+            "event_id",
+            "player_id",
+            unique=True,
+            sqlite_where=sa_text("player_id IS NOT NULL AND status != 'rejected'"),
+        ),
+        Index(
+            "uq_pointsclaim_event_team",
+            "event_id",
+            "team_id",
+            unique=True,
+            sqlite_where=sa_text("team_id IS NOT NULL AND status != 'rejected'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("pointsevent.id"), index=True)
+    entity: Mapped[str] = mapped_column(String)  # player|team（冗余自 event，便于查询）
+    player_id: Mapped[str | None] = mapped_column(ForeignKey("player.id"), index=True)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("team.id"), index=True)
+    value: Mapped[int] = mapped_column(Integer)  # 解题数/得分，资格线 ≥ 1
+    rank: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)  # staged|approved|rejected
+    submitted_by: Mapped[int] = mapped_column(Integer)  # localuser.id
+    decided_by: Mapped[int | None] = mapped_column(Integer)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class PointsEntry(Base):
+    """积分流水（双 owner）：审核通过时写入，一切积分聚合的唯一来源。
+
+    队伍赛通过 → 1 条 team 流水 + 每名现役成员 1 条 player 流水
+    （team_context=该队）；个人赛通过 → 1 条 player 流水（team_context 空）。
+    队伍复合分的排除规则 = 成员流水按 team_context != 本队 过滤。
+    payload_json 为公式输入快照（value/rank/max_value/n_teams），改配置不溯及。
+    """
+
+    __tablename__ = "pointsentry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_type: Mapped[str] = mapped_column(String)  # player|team
+    owner_id: Mapped[str] = mapped_column(String, index=True)
+    points: Mapped[float] = mapped_column(Float)
+    event_id: Mapped[int] = mapped_column(ForeignKey("pointsevent.id"), index=True)
+    claim_id: Mapped[int | None] = mapped_column(ForeignKey("pointsclaim.id"))
+    team_context: Mapped[str | None] = mapped_column(String)
+    payload_json: Mapped[str] = mapped_column(Text)
+    date: Mapped[date] = mapped_column(Date, index=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime)

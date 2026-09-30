@@ -23,6 +23,7 @@ def page_shell(*children) -> rx.Component:
                         href="/profile",
                         size="2",
                     ),
+                    rx.link("积分", href="/points", size="2"),
                     rx.cond(
                         AuthState.is_admin,
                         rx.hstack(
@@ -30,6 +31,7 @@ def page_shell(*children) -> rx.Component:
                             rx.link("选手管理", href="/admin/players", size="2"),
                             rx.link("队伍管理", href="/admin/teams", size="2"),
                             rx.link("比赛管理", href="/admin/contests", size="2"),
+                            rx.link("积分管理", href="/admin/points", size="2"),
                             rx.link("审计日志", href="/admin/audit", size="2"),
                             spacing="3",
                         ),

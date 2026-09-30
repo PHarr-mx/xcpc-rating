@@ -7,7 +7,7 @@
 - **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期（业务补齐）进行中：**公式定案 + P-R1 已落地**，训练赛录入未开始
 - **Web P0–P5 全部完成**：榜单 `/`、认证、`/profile`、管理后台 P4a–P4d、`/about`、`/players/{id}`、`/contests/{id}`、URL query 同步、赛年/赛季筛选
 - **四期业务定案完成（2026-09-28 拍板）**：训练赛 Rating = **AtCoder 式表现分体系**（规格 docs/04 §2.1）——同队三人同分、负分照实显示、仅训练赛生效；**P-R1 重放引擎已落地**（core 159 + web 94 全绿）
-- **生涯积分制（第二轨）规格讨论中**（2026-09-30）：UCup 式单场分（去 GP30、≥1 题门槛、maxSolved/n_teams 管理员配置）+「场次配置 → 认证 → 审核记分」工作流 + **双账本**（队伍积分 0.6 / 成员队外个人积分求和 0.4 复合分，三人共享按队认证）；底稿 RATING_FORMULA_PLAN.md §9，实现与训练赛录入相互独立
+- **生涯积分制 v1 已实现（2026-09-30）**：UCup 式单场分（去 GP30、≥1 题门槛、maxSolved/n_teams 管理员配置）+「场次配置 → 认证 → 审核记分」工作流 + 双账本（队伍积分 0.6 / 成员队外个人积分求和 0.4 复合分，三人共享按队认证）；core `points` 模块 + 三表（迁移 `0002_points`）+ `/points` 与 `/admin/points` 页面；core 179 + web 106 全绿
 - 旁路二项已清（alembic + DTO 前置校验，均已提交）；formal/OJ 仍为 placeholder_v0
 
 ## 最近几次会话做了什么（2026-09-26 → 09-28）
@@ -17,9 +17,13 @@
 3. **Rating 公式定案 + P-R1（本次会话）**：
    - 拍板（用户）：候选 A（AtCoder 式）、同队三人同分、负分照实显示、仅训练赛生效、Center 统一 800 暂不分档；**队伍 APerf = 队伍自身历史队 Perf 加权平均（非队员均值）→ 换员即新队先验重置**。
    - 实现：`rating/formula_params.py`（常量集中）+ `formula.py`（solve_perf 二分 / 0.9^i×权重加权平均 / f(n) / g 变换）+ `replay.py`（`AtcoderReplayEngine`：场次×日期重放、打星参与方程不入历史、并列名次取平均、周期窗口全 Center 重放）+ `ReplayEventScore` 模型；21 条新测试（含闭式解与收敛数值断言）。
-   - 文档：规格并入 docs/04 §2.1、§3 定案记录表更新、路线图 §3/§4 勾选；RATING_FORMULA_PLAN.md 保留为积分制讨论底稿（§9 暂缓）。
-
-更早（2026-09-10 → 09-15）：三期关闭、GAP 评估并入路线图、榜单 URL query 同步、data_version 写路径自动 bump、`/about`、P5 详情页（players/contests + recharts）、docs 九篇重构、赛年/赛季筛选真实生效、测试盲区补齐、推送 `90b0cef..aa412c0`。
+   - 文档：规格并入 docs/04 §2.1、§3 定案记录表更新、路线图 §3/§4 勾选。
+4. **积分制 v1 实现（本次会话续）**：
+   - core：`xcpc_core/points/`（formula/service/api/exceptions/models + DI `configure_session`），三表 `pointsevent`/`pointsclaim`/`pointsentry`（迁移 `0002_points`）；**部分唯一索引带 `status != 'rejected'` 谓词**——驳回后可重提，这个坑在 autogenerate 后人工核对时发现并修正。
+   - 工作流：管理员配置场次（entity=player|team、kind=solved|score、max_value、n_teams）→ 选手/按队提交认证 → 审核通过同事务写双 owner 流水 + auditlog（points.approve/reject）；改配置不溯及（流水带参数快照）。
+   - 复合分：队伍榜 = 0.6×团队积分 + 0.4×Σ(成员个人积分 − team_context=本队)，求和口径；个人榜直加，left 不出榜。
+   - Web：`/admin/points`（创建场次 + 待审认证通过/驳回）、`/points`（提交认证 + 我的认证 + 双榜），审计筛选动作已加 points.*。
+   - 待办：**浏览器手工验收**（项目惯例的里程碑关闭动作）；P4 正式赛免认证直录、P5 防刷上限（最好 N 场）未实现，见 §9.5。
 
 更早（2026-09-10 → 09-15）：三期关闭、GAP 评估并入路线图、榜单 URL query 同步、data_version 写路径自动 bump、`/about`、P5 详情页（players/contests + recharts）、docs 九篇重构、赛年/赛季筛选真实生效、测试盲区补齐、推送 `90b0cef..aa412c0`。
 
@@ -39,7 +43,7 @@
 
 ### 测试红线
 - **测试里禁止 `import xcpc_web.xcpc_web`（app 模块）**：顶层 `rx.App()` 会破坏 conftest 手搭的 State 链，引发 49 个跨测试 DB 复用失败。
-- conftest 用 `configure_session(session)` / `configure_store(store)` DI 注入内存 SQLite（player/team/contest/audit/importer/rating/board 全部已接）；真实 DB 零改动。
+- conftest 用 `configure_session(session)` / `configure_store(store)` DI 注入内存 SQLite（player/team/contest/audit/importer/rating/board/points 全部已接）；真实 DB 零改动。
 - 测试命令：core `uv run python -m pytest xcpc_core -v`（根目录）；web `cd xcpc_web && ../.venv/bin/python -m pytest tests -v`。根 pyproject testpaths 只含 xcpc_core。
 
 ### 数据层约定
@@ -54,7 +58,7 @@
 1. **训练赛录入（四期第 2 项）**：导入入口 + `load_training_weight` + events training 分支 + raw/training 归档（见 docs/03 §3.4）；这是 P-R2 接线的前置——没有训练赛事件，重放引擎无数据可算。
 2. **P-R2 接线**：board 训练赛榜走 `AtcoderReplayEngine`（生涯/赛年/赛季三档）+ 选手详情页曲线换 rating_after 语义 + `meta.rating_algorithm` 升版。
 3. **P-R4 试算页 `/admin/rating`**：两轨参数试算（不落库）。
-4. **积分制（第二轨）v1**：规格见 RATING_FORMULA_PLAN.md §9（工作流已定，细节 P1–P5 待定）；**与训练赛录入相互独立，可并行或提前**，等用户定优先级。
+4. **积分制收尾**：浏览器手工验收（/points 与 /admin/points）；P4 正式赛免认证直录、P5 防刷上限按需启用（RATING_FORMULA_PLAN §9.5）。
 5. 挂起的开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项，其余不阻塞。
 
 ## 关键技术结论（下次开发直接复用，避免重踩）
