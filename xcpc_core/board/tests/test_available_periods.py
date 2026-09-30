@@ -21,21 +21,21 @@ def _seed_player_and_contests(session) -> None:
     # 三场分属：2025-秋学期（2025-09~2026-01）、2026-春学期、2026-暑假，均在 2025 赛年内；
     # 每场 2 队满足「入库实体 ≥ 2」护栏
     contest_service.save_contest(ContestCreate(
-        id="c_autumn", title="秋学期赛", date=date(2025, 10, 1),
+        id="c_autumn", title="秋学期赛", date=date(2025, 10, 1), entity="player",
         standings=[
             Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
             Standing(team_name="二队", rank=2, solved=4, player_ids=["p002"]),
         ],
     ))
     contest_service.save_contest(ContestCreate(
-        id="c_spring", title="春学期赛", date=date(2026, 3, 15),
+        id="c_spring", title="春学期赛", date=date(2026, 3, 15), entity="player",
         standings=[
             Standing(team_name="一队", rank=2, solved=5, player_ids=["p001"]),
             Standing(team_name="二队", rank=1, solved=6, player_ids=["p002"]),
         ],
     ))
     contest_service.save_contest(ContestCreate(
-        id="c_summer", title="暑假赛", date=date(2026, 7, 1),
+        id="c_summer", title="暑假赛", date=date(2026, 7, 1), entity="player",
         standings=[
             Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
             Standing(team_name="二队", rank=2, solved=3, player_ids=["p002"]),

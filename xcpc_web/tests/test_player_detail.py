@@ -37,7 +37,7 @@ def _seed_player_with_event(session) -> None:
     service.create_player(PlayerCreate(name="张三", handle="zs", grade=2023))
     service.create_player(PlayerCreate(name="李四", handle="ls", grade=2023))
     ContestService(ContestStore(session)).save_contest(ContestCreate(
-        id="c1", title="省赛", date=__import__("datetime").date(2026, 5, 1),
+        id="c1", title="省赛", date=__import__("datetime").date(2026, 5, 1), entity="player",
         standings=[
             Standing(team_name="一队", rank=1, solved=5, penalty=100, player_ids=["p001"]),
             Standing(team_name="二队", rank=2, solved=4, penalty=200, player_ids=["p002"]),
@@ -56,8 +56,16 @@ def test_on_load_loads_player_and_history(build_state, core_store):
     assert st.player["status_label"] == "现役"
     assert len(st.history) == 1
     assert st.history[0]["contest_id"] == "c1"
-    assert st.history[0]["rating_after"] == 950.0  # (2-1+1)/2*800 + 5*30，weight=100
-    assert st.chart_points == [{"date": st.history[0]["date"], "rating_after": 950.0}]
+    # AtCoder 重放：两队全 Center 首场闭式解，rating = perf − f(1)，负分照实显示
+    import math
+
+    from xcpc_core.rating.formula_params import CENTER
+
+    spread = 400.0 * math.log(3, 6) * 1.5
+    expected = round(CENTER + spread - 1200.0, 2)
+    assert st.history[0]["rating_after"] == expected
+    assert st.history[0]["rating_delta"] == expected  # 首场相对 0 起点
+    assert st.chart_points == [{"date": st.history[0]["date"], "rating_after": expected}]
 
 
 def test_on_load_missing_player_shows_not_found(build_state, core_store):

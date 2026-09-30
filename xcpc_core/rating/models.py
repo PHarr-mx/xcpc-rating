@@ -81,7 +81,7 @@ class RatingResult(BaseModel):
 
 
 class PlayerEventRecord(BaseModel):
-    """选手个人页的参赛记录：一次事件 + 逐场累计 Rating（现公式下为得分累加）。"""
+    """选手个人页的参赛记录：一次事件 + 逐场 Rating（AtCoder 式重放语义，P-U2 起）。"""
 
     event_id: str
     contest_id: str
@@ -94,7 +94,7 @@ class PlayerEventRecord(BaseModel):
     rank: int | None = None
     solved: int | None = None
     penalty: int | None = None
-    score: int | None = None  # oi 用的题目分值，与 contribution（rating 贡献）区分
+    score: int | None = None  # ioi 用的题目分值，与 rating_delta（Rating 变化）区分
     award: str | None = None
-    contribution: float  # 本场对 rating 的贡献（已含权重）
-    rating_after: float  # 按日期升序累计到本场后的 rating
+    rating_delta: float  # 该场 Rating 变化（首场相对 0 起点计）
+    rating_after: float  # 按日期升序累计到该场后的 AtCoder 式 Rating

@@ -60,9 +60,8 @@ class BoardState(rx.State):
         elif self.sort_by == "name_desc":
             rows.sort(key=lambda x: (-ord(x["name"][0]) if x["name"] else 0, x["player_id"]))
 
-        for i, row in enumerate(rows, 1):
-            row["rank"] = i
-
+        # rank 保留核心侧的竞赛排名（同分同 rank、下一名跳号；AtCoder 重放语义下
+        # 同队同分常态化，不能按行序重新编号——搜索过滤后保留其在总榜中的名次）
         return rows
 
     @staticmethod

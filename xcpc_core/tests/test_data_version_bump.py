@@ -136,7 +136,7 @@ def test_board_cache_invalidated_by_write(monkeypatch):
         _make_player_service(s).create_player(PlayerCreate(name="张三", handle="zs", grade=2023))
         _make_player_service(s).create_player(PlayerCreate(name="李四", handle="ls", grade=2023))
         _make_contest_service(s).save_contest(ContestCreate(
-            id="c1", title="测试赛", date=date(2026, 5, 1),
+            id="c1", title="测试赛", date=date(2026, 5, 1), entity="player",
             standings=[
                 Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
                 Standing(team_name="二队", rank=2, solved=4, player_ids=["p002"]),
@@ -163,4 +163,4 @@ def test_meta_row_created_with_default_algorithm(db_session):
     db_session.commit()
     row = db_session.get(MetaRow, 1)
     assert row.data_version == 1
-    assert row.rating_algorithm == "placeholder_v0"
+    assert row.rating_algorithm == "atcoder_v1"

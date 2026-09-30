@@ -139,11 +139,17 @@ def test_build_events_from_contests_and_api(db_session):
     assert len(result.scores) == 4
     p001 = next(s for s in result.scores if s.player_id == "p001")
     assert p001.event_count == 1
-    # 占位公式：团队基础分按队员数均分（一队 3 人 < 单人队 p004 的人均值）
+    # AtCoder 重放：两队全 Center 先验首场闭式解；rating = perf − f(1)，负分照实显示
+    import math
+
+    from xcpc_core.rating.formula_params import CENTER
+
+    spread = 400.0 * math.log(3, 6) * 1.5
     rank1 = next(s for s in result.scores if s.player_id == "p001")
     rank2 = next(s for s in result.scores if s.player_id == "p004")
-    assert rank1.rating == pytest.approx(round(((2 - 1 + 1) / 2 * 800 + 8 * 30) / 3, 2))  # 346.67
-    assert rank2.rating == pytest.approx(round((2 - 2 + 1) / 2 * 800 + 7 * 30, 2))  # 610.0
+    assert rank1.rating == pytest.approx(round(CENTER + spread - 1200.0, 2))
+    assert rank2.rating == pytest.approx(round(CENTER - spread - 1200.0, 2))
+    assert rank1.rating > rank2.rating
 
 
 def test_build_events_tier_weight_and_rerank_ties(db_session):

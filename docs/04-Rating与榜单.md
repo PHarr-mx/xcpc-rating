@@ -5,31 +5,34 @@
 - **rating 模块**（`xcpc_core/rating/`）：把统一事件流分发到计算器，算出选手得分
 - **board 模块**（`xcpc_core/board/`）：把得分聚合成榜单快照（只读，缓存）
 
-> 实现状态（2026-10-01）：**比赛统一化 P-U1 已落地**——事件流只取 `counts_for_ranking=True` 的统一比赛（`source_type="contest"`），权重 = tier.coefficient×100；「仅正式赛」榜单模式已随之移除。
-> 训练赛 Rating 公式定案于 §2.1（AtCoder 式表现分）；board 榜单切重放引擎为 P-U2 待办。
+> 实现状态（2026-10-01）：**P-U2 计分接线已落地**——榜单与选手历史全部走 AtCoder 重放
+> （`meta.rating_algorithm = atcoder_v1`，迁移 `0004`），事件流只取 `counts_for_ranking=True`
+> 的统一比赛（`source_type="contest"`），等级系数经事件权重（coefficient×100）进 0.9^i 时间加权；
+> 「仅正式赛」榜单模式已移除。旧逐事件计算器保留给未来 OJ 数据源。
 
 ---
 
 ## 1. 计算器架构
 
 ```
-BaseRatingCalculator (ABC)                  compute() = base × weight / 100
-├── ContestDispatcher             "contest"       ✅ 统一比赛（placeholder），按 (format, entity) 分发
-│   ├── ContestTeamCalculator         icpc×team（团队均分）
-│   ├── ContestSoloCalculator         icpc×player
-│   └── ContestOiCalculator           ioi×player
-├── FormalCalculator              "formal"        🔜 旧路径保留（无新事件写入）
-├── TrainingDispatcher            "training"      🔜 旧路径保留（无新事件写入）
+AtcoderReplayEngine（P-U2 起榜单唯一算法，meta.rating_algorithm = atcoder_v1）
+  按 (场次, date) 重放统一比赛事件流 → 每选手逐场 ReplayEventScore{perf, rating_after}
+BaseRatingCalculator (ABC)                  compute() = base × weight / 100（旧逐事件路径）
+├── ContestDispatcher             "contest"       🔜 已写，P-U2 起不再被榜单消费
+├── FormalCalculator              "formal"        🔜 同上
+├── TrainingDispatcher            "training"      🔜 同上
 ├── OjContestCalculator           "oj_contest"    🔜 已写，永不触发（无数据源）
 └── OjPracticeCalculator          "oj_practice"   🔜 已写，永不触发（无数据源）
 ```
 
-- 基类接口：`compute_base_score(event)`（抽象）+ 模板方法 `compute(event) = base * event.weight / 100`
-- `RatingEngine`（`rating/engine.py`）编排：**过滤（period；mode 已收敛为 all）→ 逐事件算分 → 按 player 聚合得分序列（按 date 升序）**
-- 权重：统一比赛 = **tier.coefficient × 100**（事件生成阶段写入，整数）；OJ 用 `oj.contest_default` / `practice_default`（数据源待建）
-- 统一比赛占位公式按**重排名口径**：`(n_recorded − internal_rank + 1)/n_recorded × 800 + solved×30`（ioi 用 score×2，团队再按 size 均分）
-- 算法与流水线解耦：正式算法确定后只换对应子类，`meta.rating_algorithm` 版本号随之更新
-- **重放引擎**（`rating/replay.py`，§2.1 定案的实现载体）：AtCoder 式公式跨选手耦合、按时间序依赖（第 r 名的表现分依赖当时全场先验），与逐事件计算器不同，须按场次 × 日期重放全场事件流；P-U2 将把 board 榜单切到该引擎
+- **榜单语义（P-U2 起）**：`rating` = 该选手重放序列最后一场的 rating_after；
+  `delta_recent` = 最近一场 Rating 变化（首场相对 0 起点计）。生涯 = 全史重放；
+  赛年/赛季 = 窗口内以全 Center 重放。同分同 rank、下一名跳号（同队同分常态化，
+  前端不得按行序重新编号）
+- `RatingEngine`（`rating/engine.py`）旧逐事件路径保留：`compute_base_score(event)`（抽象）
+  + `compute(event) = base * event.weight / 100`；未来 OJ 数据源复用
+- 事件权重 = **tier.coefficient × 100**（事件生成阶段写入，整数；重放内融进 0.9^i 时间加权）
+- 算法版本记录在 `meta.rating_algorithm`（`0004_atcoder_v1` 迁移负责存量升级）
 
 ## 2. 现行公式
 

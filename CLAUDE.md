@@ -133,7 +133,7 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
   - **参考**（描述已实现系统，含代码路径）：`01-架构与数据流`、`02-选手与队伍`、`03-比赛与导入`（formal 部分）、`04-Rating与榜单`（骨架部分）、`05-Web与认证`（已上线部分）
   - **待建**（设计已定、代码未写）：`03`（训练赛/OJ）、`04`（正式公式）、`05`（详情页/P6）、`06-部署与运维`
   - **指南/计划**：`07-开发流程`（含避坑清单）、`08-路线图`（进度与剩余工作权威来源）
-- **已实现**：SQLite 持久化（20 张表，alembic 管）、选手/队伍 CRUD、正式赛导入全链路、**比赛统一化 P-U1**（tier/awardlevel 表 + contest 改造 + points 改挂 contest + `/admin/tiers` 与统一创建表单）、rating 引擎（placeholder_v0 计算器 + AtCoder 式重放引擎）、board 榜单聚合（写路径自动 bump data_version）、积分制 v1、Reflex 全部已上线页面、认证与三层权限守卫。
-- **未实现**：board 榜单切重放引擎（P-U2）、通用 JSON 导入（P-U3）、OJ 数据源（三表零代码）、权重试算页、部署上线。进度权威见 [docs/08-路线图.md](docs/08-路线图.md) 与 CONTEST_UNIFICATION_PLAN.md。
+- **已实现**：SQLite 持久化（20 张表，alembic 管）、选手/队伍 CRUD、正式赛导入全链路、**比赛统一化 P-U1+P-U2**（tier/awardlevel + contest 改造 + points 改挂 + 统一管理页；榜单/选手历史走 AtCoder 重放，`meta.rating_algorithm=atcoder_v1`）、积分制 v1、Reflex 全部已上线页面、认证与三层权限守卫。
+- **未实现**：通用 JSON 导入（P-U3）、OJ 数据源（三表零代码）、权重试算页、部署上线。进度权威见 [docs/08-路线图.md](docs/08-路线图.md) 与 CONTEST_UNIFICATION_PLAN.md。
 - 原 Vue 静态站方案、v1 版 docs（DESIGN + 01–14）已删除（留 Git 历史）。
 - `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流与避坑见 `docs/07-开发流程.md`。

@@ -1,7 +1,7 @@
 # 比赛统一化改造方案（P-U1 已实施）
 
 > 2026-09-30 评审定稿（D1–D6 全部拍板）→ **2026-10-01 P-U1 已落地并提交**（提交 `bd5f0b4`，真库已升级迁移 `0003`，core 195 + web 106 全绿，浏览器验收通过）。
-> 进度：**P-U1 数据与管理端 ✅**；P-U2 计分接线、P-U3 通用 JSON 导入待做。
+> 进度：**P-U1 数据与管理端 ✅；P-U2 计分接线 ✅（2026-10-01，迁移 `0004_atcoder_v1`，榜单/选手历史切 AtCoder 重放）**；P-U3 通用 JSON 导入待做。
 > 全部期次完成后本稿并入 docs/03、04 并删除。
 
 ## 1. 目标与对既有决策的修订
@@ -121,7 +121,7 @@
 | 期 | 内容 | 估量 | 状态 |
 |----|------|------|------|
 | **P-U1 数据与管理端** | tier/awardlevel 表 + 迁移（含存量映射）+ 管理页；contest 表改造 + 统一创建表单；claim/entry 改挂 contest；既有测试迁移 | ~1 天 | ✅ 2026-10-01（`bd5f0b4`） |
-| **P-U2 计分接线** | compute_points 统一（formula/award_only × 系数）；导入/认证 → 流水；counts_for_ranking → 事件流 + replay；/points 表单按 scoring 切换；详情页标签 | ~1 天 | 部分随 P-U1 完成（计分公式与事件流过滤已接线），余 board 切 replay 引擎 + 系数进时间加权 |
+| **P-U2 计分接线** | compute_points 统一（formula/award_only × 系数）；导入/认证 → 流水；counts_for_ranking → 事件流 + replay；/points 表单按 scoring 切换；详情页标签 | ~1 天 | ✅ 2026-10-01（迁移 `0004_atcoder_v1`；榜单与选手历史切 `AtcoderReplayEngine`，系数进 0.9^i 时间加权；`rating_delta` 替代旧贡献分；榜单算法升版 atcoder_v1） |
 | **P-U3 通用 JSON 导入** | 通用 JSON 模板导入（含姓名匹配/自动建队），原训练赛录入方案并入 | ~半天 | 未开始 |
 
 P-U1 落地备注：

@@ -6,14 +6,20 @@
 
 - **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期进行中：公式定案 + P-R1 + 积分制 v1 已落地
 - **Web P0–P5 全部完成**；新布局（顶栏大类 + 恒显侧边栏）已上线
-- **比赛统一化改造 P-U1 已落地（2026-10-01，按 CONTEST_UNIFICATION_PLAN.md）**：
+- **比赛统一化 P-U1 已落地（2026-10-01，按 CONTEST_UNIFICATION_PLAN.md）**：
   - 新表 `tier`（赛事等级=系数，config 种子 + 兜底「未分级」）与 `awardlevel`（奖项基线 金100/银60/铜30/优胜20），迁移 `0003_unify_contest`；真库已升级并验证存量映射（省赛→ICPC 省赛 0.7 计排名不计积分，测试积分场→`points_{id}` 计积分可申报）
   - `contest` 表改造：`format: icpc|ioi` × `entity: player|team` × `tier_id` + `max_value`/`scoring: formula|award_only`/`counts_for_points`/`counts_for_ranking`/`allow_claims`；旧列 source_type/contest_type/division/weight/rated **已删除**
   - `pointsevent` 已删表并入 contest；`pointsclaim`/`pointsentry` 改挂 `contest_id`，claim 支持 award 申报（value/rank 可空）
   - 新 `xcpc_core/tier/` 模块（六件套）；Web 新页 `/admin/tiers`（等级+奖项同页管理）、`/admin/contests` 统一创建表单、`/admin/points` 只留审批、`/points` 表单按 scoring 切换
-  - core 195 + web 106 全绿；浏览器验收通过（临时管理员 pu1_verify 已删）
+- **比赛统一化 P-U2 计分接线已落地（2026-10-01，迁移 `0004_atcoder_v1`）**：
+  - **榜单与选手历史全部切 `AtcoderReplayEngine`**：rating = 重放序列末场 rating_after（生涯=全史重放；赛年/赛季=窗口全 Center 重放）；`delta_recent` = 最近一场 Rating 变化（首场相对 0）；选手页「贡献」列换「Rating 变化」（`PlayerEventRecord.rating_delta`）
+  - `meta.rating_algorithm` 升版 **atcoder_v1**（`0004` 数据迁移 + tables 默认值 + board.models.DEFAULT_ALGORITHM）
+  - tier.coefficient 经事件权重（系数×100）进 0.9^i 时间加权；重放引擎适配统一事件（source_type=contest、payload.entity 判定组队）
+  - **修复前端 rank 显示 bug**：`BoardState._filter_and_sort_rows` 曾把核心竞赛排名覆盖为行序号，同队同分常态化后显形——现已保留核心 rank（同分同 rank 跳号，过滤/重排后不重编号）
+  - 真库数据验证：省赛 11 队重排名 → 506.83 / 91.03×3（rank 2,2,2）/ 负分照实（−135.97 等）
+  - core 195 + web 106 全绿；浏览器验收通过
 - 两轨制修订（D1）：「仅训练赛生效」→ 逐场 `counts_for_ranking`；榜单「仅正式赛」mode 已删除（`BoardMode = Literal["all"]`），formal_only URL 参数被忽略
-- formal/OJ 仍为 placeholder_v0；P-U2（计分接线）与 P-U3（通用 JSON 导入）未开始
+- formal 旧逐事件计算器保留（OJ 未来复用）；P-U3（通用 JSON 导入）未开始
 
 ## 最近几次会话做了什么（2026-09-26 → 10-01）
 
@@ -70,11 +76,9 @@
 
 ## 下一步
 
-1. **P-U2 计分接线（CONTEST_UNIFICATION_PLAN §7）**：compute_points 统一（formula/award_only × 系数，core 侧已就位）→ 导入/认证 → 流水全链路核对；`counts_for_ranking` 事件流已过滤，**board 训练/生涯榜切 `AtcoderReplayEngine`**（tier.coefficient 进 0.9^i 时间加权）+ 选手页曲线换 rating_after + `meta.rating_algorithm` 升版；详情页标签已做，可复查。
-2. **P-U3 通用 JSON 导入**：任意比赛数据导入（姓名匹配/自动建队复用 formal 逻辑），原「训练赛录入」方案并入此通道。
-3. 积分制遗留：P4 正式赛免认证直录、P5 防刷上限（RATING_FORMULA_PLAN §9.5）。
-4. CONTEST_UNIFICATION_PLAN.md 定稿后并入 docs/03、04 并删除本稿（稿首注明）。
-5. 挂起开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项。
+1. **P-U3 通用 JSON 导入（比赛统一化收官）**：任意比赛数据导入（姓名匹配/自动建队复用 formal 逻辑），raw 归档统一 `data/raw/contests/`；完成后 CONTEST_UNIFICATION_PLAN.md 并入 docs/03、04 并删除本稿。
+2. 积分制遗留：P4 正式赛免认证直录、P5 防刷上限（RATING_FORMULA_PLAN §9.5）。
+3. 挂起开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项。
 
 ## 关键技术结论（下次开发直接复用，避免重踩）
 

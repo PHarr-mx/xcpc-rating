@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from xcpc_core.board.models import BoardSnapshot
+from xcpc_core.board.models import DEFAULT_ALGORITHM, BoardSnapshot
 from xcpc_core.board.service import BoardService
 from xcpc_core.db.session import make_session_factory
 from xcpc_core.db.tables import Contest as ContestRow
@@ -54,7 +54,7 @@ def _read_meta(session: Session) -> tuple[int, str]:
     """读单行 meta 表：(data_version, rating_algorithm)。无行时返回缺省。"""
     row = session.get(MetaRow, 1)
     if row is None:
-        return 0, "placeholder_v0"
+        return 0, DEFAULT_ALGORITHM
     return row.data_version, row.rating_algorithm
 
 

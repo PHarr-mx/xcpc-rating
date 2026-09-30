@@ -224,7 +224,7 @@ class Meta(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     data_version: Mapped[int] = mapped_column(Integer, default=0)
-    rating_algorithm: Mapped[str] = mapped_column(String, default="placeholder_v0")
+    rating_algorithm: Mapped[str] = mapped_column(String, default="atcoder_v1")
     updated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 

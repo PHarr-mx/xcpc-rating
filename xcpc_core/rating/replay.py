@@ -1,4 +1,4 @@
-"""训练赛 Rating 重放引擎（docs/04 §2.1 定案，P-R1）。
+"""Rating 重放引擎（docs/04 §2.1 定案，P-R1；P-U2 起消费统一比赛事件流）。
 
 与逐事件计算器（engine.py）不同，AtCoder 式公式跨选手耦合、按时间序依赖：
 第 r 名的表现分依赖「当时」全场每个参赛实体的 APerf。本引擎按场次（event_id
@@ -6,7 +6,7 @@
 表现分，产出每选手逐场 ``ReplayEventScore``（perf + rating_after）。
 
 定案语义（2026-09-28）：
-- 组队赛（team_xcpc）参赛实体为队伍：APerf = 队伍自身历史队 Perf 加权平均；
+- 组队赛（entity=team）参赛实体为队伍：APerf = 队伍自身历史队 Perf 加权平均；
   换员即新队（member_key 约定，team_id 已随之稳定）→ 先验重置 Center
 - solo/oi 参赛实体为个人：APerf = 个人历史加权平均
 - 同队三人同分：队 Perf 全额记入每名队员个人历史
@@ -32,7 +32,7 @@ def _perf_weights(hist: list[tuple[float, int]]) -> tuple[list[float], list[int]
 
 
 class AtcoderReplayEngine:
-    """按场次 × 日期重放训练赛事件流（仅消费 source_type=training）。"""
+    """按场次 × 日期重放统一比赛事件流（source_type=contest，P-U2 起榜单数据源）。"""
 
     def compute_series(
         self,
@@ -40,7 +40,7 @@ class AtcoderReplayEngine:
         *,
         period: PeriodFilter | None = None,
     ) -> dict[str, list[ReplayEventScore]]:
-        scoped = [e for e in events if e.source_type == "training"]
+        scoped = [e for e in events if e.source_type == "contest"]
         if period is not None:
             scoped = [
                 e
@@ -71,7 +71,11 @@ class AtcoderReplayEngine:
     ) -> None:
         first = contest_events[0]
         weight = first.weight
-        if first.contest_format == "team_xcpc":
+        # 参与形式：事件生成阶段写入 payload.entity（缺省按 team_id 推断，兼容旧事件）
+        entity = first.payload.get("entity")
+        if entity is None:
+            entity = "team" if any(e.team_id for e in contest_events) else "player"
+        if entity == "team":
             entrants = self._team_entrants(contest_events)
         else:
             entrants = [

@@ -1,7 +1,8 @@
-"""榜单模块测试（docs/07）：聚合、排名、过滤、缓存。"""
+"""榜单模块测试（docs/07）：聚合、排名、过滤、缓存（P-U2 重放语义）。"""
 
 from __future__ import annotations
 
+import math
 from datetime import date
 
 import pytest
@@ -19,7 +20,15 @@ from xcpc_core.db.base import Base
 from xcpc_core.db import tables  # noqa: F401  注册全部表
 from xcpc_core.player.models import Player, PlayerStatus
 from xcpc_core.player.store import PlayerStore
+from xcpc_core.rating.formula_params import CENTER
 from xcpc_core.rating.models import PeriodFilter
+
+# 两实体全 Center 先验首场闭式解（n=2，首场膨胀 ×1.5）
+_SPREAD = 400.0 * math.log(3, 6) * 1.5
+_PERF_RANK1 = CENTER + _SPREAD
+_PERF_RANK2 = CENTER - _SPREAD
+_RATING_RANK1 = round(_PERF_RANK1 - 1200.0, 2)  # 首场 rating = perf − f(1)
+_RATING_RANK2 = round(_PERF_RANK2 - 1200.0, 2)
 
 
 @pytest.fixture(autouse=True)
@@ -52,12 +61,14 @@ def _save_contest(
     date_: date,
     standings: list[Standing],
     tier_id: int | None = None,
+    entity: str = "team",
 ) -> None:
     contest_api.save_contest(ContestCreate(
         id=contest_id,
         title=f"测试比赛 {contest_id}",
         date=date_,
         tier_id=tier_id,
+        entity=entity,
         school_teams_count=len(standings),
         standings=standings,
     ))
@@ -90,21 +101,21 @@ def test_board_basic_structure_and_rank_ties(db_session):
     assert snap.meta.period_type == "career"
     assert snap.meta.period_id is None
     assert snap.meta.period_label == "生涯"
-    assert snap.meta.algorithm == "placeholder_v0"
+    assert snap.meta.algorithm == "atcoder_v1"
     assert snap.meta.data_version == 0
     assert snap.meta.generated_at is not None
     # 行：4 名选手，按 rating 降序
     assert [r.player_id for r in snap.rows] == ["p001", "p002", "p003", "p004"]
     # 同队同分 → 竞赛排名 1,1,3,3（同分同 rank、下一名跳号）
     assert [r.rank for r in snap.rows] == [1, 1, 3, 3]
-    # 占位公式（统一比赛）：(n_recorded − internal_rank + 1)/n_recorded × 800 + solved×30，再按队员数均分
-    assert snap.rows[0].rating == pytest.approx(((2 - 1 + 1) / 2 * 800 + 8 * 30) / 2)  # 520.0
-    assert snap.rows[2].rating == pytest.approx(((2 - 2 + 1) / 2 * 800 + 7 * 30) / 2)  # 305.0
+    # AtCoder 重放：首场 rating = perf − f(1)；同队三人同分
+    assert snap.rows[0].rating == pytest.approx(_RATING_RANK1)
+    assert snap.rows[2].rating == pytest.approx(_RATING_RANK2)
     # 展示字段
     assert snap.rows[0].name == "张三"
     assert snap.rows[0].grade_label == "2024级"
     assert snap.rows[1].grade_label == "未设置"
-    # 仅一场比赛：delta_recent == rating
+    # 仅一场比赛：delta_recent == rating（相对 0 起点的一场变化）
     assert snap.rows[0].event_count == 1
     assert snap.rows[0].delta_recent == pytest.approx(snap.rows[0].rating)
 
@@ -132,40 +143,49 @@ def test_board_excludes_left_players(db_session):
 
 def test_board_period_filter_and_delta_recent(db_session):
     _save_players(db_session, _player("p001", name="张三"), _player("p002", name="李四"))
-    # 两场比赛，rank 不同 → 得分不同，便于区分 delta_recent（各 2 队过「实体 ≥ 2」护栏）
+    # 两场个人赛，名次不同 → 表现分不同，便于区分 delta_recent（各 2 实体过护栏）
     _save_contest(
         contest_id="c_a",
         date_=date(2026, 3, 15),
+        entity="player",
         standings=[
-            Standing(team_id="t001", team_name="一队", rank=1, solved=5, player_ids=["p001"]),
-            Standing(team_id="t002", team_name="二队", rank=2, solved=4, player_ids=["p002"]),
+            Standing(team_name="张三", rank=1, solved=5, player_ids=["p001"]),
+            Standing(team_name="李四", rank=2, solved=4, player_ids=["p002"]),
         ],
     )
     _save_contest(
         contest_id="c_b",
         date_=date(2026, 4, 20),
+        entity="player",
         standings=[
-            Standing(team_id="t001", team_name="一队", rank=2, solved=5, player_ids=["p001"]),
-            Standing(team_id="t002", team_name="二队", rank=1, solved=6, player_ids=["p002"]),
+            Standing(team_name="张三", rank=2, solved=5, player_ids=["p001"]),
+            Standing(team_name="李四", rank=1, solved=6, player_ids=["p002"]),
         ],
     )
 
-    # 整个春学期：两场都算，delta_recent = 最近一场（c_b）的得分
+    # 期望值用同套公式函数复算（公式数学由 test_atcoder_formula 覆盖，此处验证 wiring）：
+    # c_a 胜（perf=_PERF_RANK1）→ c_b 败（先验变化后的 solve_perf）
+    from xcpc_core.rating.formula import rating_from_history, solve_perf
+
+    perf_b = solve_perf(2.0, [_PERF_RANK1, _PERF_RANK2])
+    expected_rating = round(rating_from_history([perf_b, _PERF_RANK1], [100, 100]), 2)
+    expected_delta = round(rating_from_history([perf_b, _PERF_RANK1], [100, 100]) - (_PERF_RANK1 - 1200.0), 2)
+
+    # 整个春学期：两场都算，delta_recent = 最近一场（c_b）的 Rating 变化
     spring = PeriodFilter(type="season", id="2026-春学期", start=date(2026, 3, 1), end=date(2026, 6, 30))
     snap = BoardService(db_session).build(mode="all", period=spring)
-    row = snap.rows[0]
+    row = next(r for r in snap.rows if r.player_id == "p001")  # c_b 胜者 p002 rating 更高
     assert row.event_count == 2
-    # c_a rank1 → 950；c_b rank2 → 550
-    assert row.rating == pytest.approx(950.0 + 550.0)
-    assert row.delta_recent == pytest.approx(550.0)
+    assert row.rating == pytest.approx(expected_rating)
+    assert row.delta_recent == pytest.approx(expected_delta)
 
-    # 只含 3 月：只有 c_a，delta_recent = c_a 得分
+    # 只含 3 月：只有 c_a，delta_recent = rating（单场，相对 0 起点）
     march = PeriodFilter(type="season", id="2026-春学期", start=date(2026, 3, 1), end=date(2026, 3, 31))
     snap_march = BoardService(db_session).build(mode="all", period=march)
     row_march = snap_march.rows[0]
     assert row_march.event_count == 1
-    assert row_march.rating == pytest.approx(950.0)
-    assert row_march.delta_recent == pytest.approx(950.0)
+    assert row_march.rating == pytest.approx(_RATING_RANK1)
+    assert row_march.delta_recent == pytest.approx(_RATING_RANK1)
 
 
 def test_board_competition_year_label_and_filter(db_session):

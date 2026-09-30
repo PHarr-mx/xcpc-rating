@@ -20,12 +20,13 @@ def _event(
     d: date,
     team_id: str | None = None,
     weight: int = 100,
-    fmt: str = "team_xcpc",
+    fmt: str = "icpc",
+    entity: str = "player",
     unofficial: bool = False,
 ) -> RatingEvent:
     return RatingEvent(
         event_id=f"{contest_id}#{next(_seq)}",
-        source_type="training",
+        source_type="contest",
         date=d,
         competition_year=2025,
         season="2025-秋学期",
@@ -33,14 +34,18 @@ def _event(
         player_id=player_id,
         team_id=team_id,
         weight=weight,
-        payload={"rank": rank, **({"unofficial": True} if unofficial else {})},
+        payload={
+            "rank": rank,
+            "entity": entity,
+            **({"unofficial": True} if unofficial else {}),
+        },
     )
 
 
 def _team(contest_id, team_id, members, rank, d, weight=100, unofficial=False):
     return [
         _event(contest_id=contest_id, player_id=m, team_id=team_id, rank=rank,
-               d=d, weight=weight, unofficial=unofficial)
+               d=d, weight=weight, entity="team", unofficial=unofficial)
         for m in members
     ]
 
@@ -91,11 +96,11 @@ def test_second_contest_uses_team_history():
 def test_solo_contest_personal_history():
     d2 = date(2025, 9, 17)
     events = [
-        _event(contest_id="s1", player_id="p1", rank=1, d=D1, fmt="solo_xcpc"),
-        _event(contest_id="s1", player_id="p2", rank=2, d=D1, fmt="solo_xcpc"),
-        _event(contest_id="s2", player_id="p1", rank=3, d=d2, fmt="oi"),
-        _event(contest_id="s2", player_id="p2", rank=1, d=d2, fmt="oi"),
-        _event(contest_id="s2", player_id="p3", rank=2, d=d2, fmt="oi"),
+        _event(contest_id="s1", player_id="p1", rank=1, d=D1),
+        _event(contest_id="s1", player_id="p2", rank=2, d=D1),
+        _event(contest_id="s2", player_id="p1", rank=3, d=d2, fmt="ioi"),
+        _event(contest_id="s2", player_id="p2", rank=1, d=d2, fmt="ioi"),
+        _event(contest_id="s2", player_id="p3", rank=2, d=d2, fmt="ioi"),
     ]
     series = AtcoderReplayEngine().compute_series(events)
     assert len(series["p1"]) == 2
@@ -121,7 +126,7 @@ def test_unofficial_participates_but_not_recorded():
 def test_tied_ranks_averaged():
     """三人并列第 1 → 平均名次 2.0；n=3 全 Center：t = (2−0.5)/3 = 0.5 → X 恰为 Center。"""
     events = [
-        _event(contest_id="s1", player_id=p, rank=1, d=D1, fmt="solo_xcpc")
+        _event(contest_id="s1", player_id=p, rank=1, d=D1)
         for p in ("p1", "p2", "p3")
     ]
     series = AtcoderReplayEngine().compute_series(events)
@@ -187,8 +192,8 @@ def test_strong_team_rating_climbs():
 
 def test_inconsistent_team_rank_raises():
     events = [
-        _event(contest_id="c1", player_id="p1", team_id="t1", rank=1, d=D1),
-        _event(contest_id="c1", player_id="p2", team_id="t1", rank=2, d=D1),
+        _event(contest_id="c1", player_id="p1", team_id="t1", rank=1, d=D1, entity="team"),
+        _event(contest_id="c1", player_id="p2", team_id="t1", rank=2, d=D1, entity="team"),
     ]
     with pytest.raises(ValueError, match="名次不一致"):
         AtcoderReplayEngine().compute_series(events)
@@ -202,6 +207,6 @@ def test_missing_rank_raises():
 
 
 def test_team_event_without_team_id_raises():
-    event = _event(contest_id="c1", player_id="p1", rank=1, d=D1)  # team_xcpc 但无 team_id
+    event = _event(contest_id="c1", player_id="p1", rank=1, d=D1, entity="team")
     with pytest.raises(ValueError, match="team_id"):
         AtcoderReplayEngine().compute_series([event])

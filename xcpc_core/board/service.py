@@ -3,7 +3,9 @@
 输入：一个 DB session（数据经 rating 事件流 + player 名册）。
 输出：BoardSnapshot —— 按 rating 降序、同分按 player_id 字典序、竞赛排名（1,2,2,4）。
 
-只读聚合，不写任何表；依赖 rating 引擎的事件得分序列计算 ``delta_recent``。
+P-U2 起 rating 语义为 AtCoder 式重放（`AtcoderReplayEngine`）：rating = 该选手
+重放序列最后一场的 rating_after（生涯=全史重放；赛年/赛季=窗口内全 Center 重放）；
+``delta_recent`` = 最近一场的 Rating 变化（首场相对 0 起点计）。只读聚合，不写任何表。
 """
 
 from __future__ import annotations
@@ -20,9 +22,9 @@ from xcpc_core.board.models import (
 )
 from xcpc_core.player.models import PlayerStatus
 from xcpc_core.player.store import PlayerStore
-from xcpc_core.rating.engine import RatingEngine
 from xcpc_core.rating.events import build_events_from_contests
 from xcpc_core.rating.models import PeriodFilter
+from xcpc_core.rating.replay import AtcoderReplayEngine
 
 
 def period_label(period: PeriodFilter) -> str:
@@ -48,9 +50,8 @@ class BoardService:
         generated_at: datetime | None = None,
     ) -> BoardSnapshot:
         period = period or PeriodFilter()
-        series = RatingEngine().compute_series(
+        series = AtcoderReplayEngine().compute_series(
             build_events_from_contests(self.session),
-            mode=mode,
             period=period,
         )
 
@@ -62,14 +63,16 @@ class BoardService:
             if player is None or player.status == PlayerStatus.left:
                 # 离队选手不出现在榜单（docs/08 §4.1）；退役保留、数据与 Rating 保留
                 continue
+            last = values[-1].rating_after
+            prev = values[-2].rating_after if len(values) > 1 else 0.0
             rows.append(BoardRow(
                 rank=0,  # 排序后统一赋值
                 player_id=player_id,
                 name=player.name,
                 grade_label="未设置" if player.grade == 0 else f"{player.grade}级",
-                rating=round(sum(item.score for item in values), 2),
+                rating=round(last, 2),
                 event_count=len(values),
-                delta_recent=round(values[-1].score, 2),  # 最近一次事件（按 date 升序末尾）
+                delta_recent=round(last - prev, 2),  # 最近一场 Rating 变化（首场相对 0）
             ))
 
         rows.sort(key=lambda row: (-row.rating, row.player_id))

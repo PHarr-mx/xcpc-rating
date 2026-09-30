@@ -31,7 +31,7 @@ def _records_table() -> rx.Component:
                 rx.table.column_header_cell("比赛"),
                 rx.table.column_header_cell("名次"),
                 rx.table.column_header_cell("解题/得分"),
-                rx.table.column_header_cell("贡献"),
+                rx.table.column_header_cell("Rating 变化"),
                 rx.table.column_header_cell("累计 Rating"),
             ),
         ),
@@ -55,7 +55,7 @@ def _records_table() -> rx.Component:
                             rx.cond(r["score"], f'{r["score"]} 分', "—"),
                         )
                     ),
-                    rx.table.cell(f'{r["contribution"]:.1f}'),
+                    rx.table.cell(f'{r["rating_delta"]:+.1f}'),
                     rx.table.cell(f'{r["rating_after"]:.1f}'),
                 ),
             )

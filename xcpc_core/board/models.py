@@ -12,8 +12,8 @@ from pydantic import BaseModel
 
 from xcpc_core.rating.models import BoardMode, PeriodType
 
-# 与 docs/06 §2.5 的占位算法版本号保持一致（meta.rating_algorithm 缺省值）
-DEFAULT_ALGORITHM = "placeholder_v0"
+# AtCoder 式重放引擎（P-U2 起榜单算法；meta.rating_algorithm 缺省值）
+DEFAULT_ALGORITHM = "atcoder_v1"
 # 排名规则说明（docs/07 §4.3）：rating 降序，同分按 player_id 字典序，同分同 rank、下一名跳号
 TIE_BREAK_DESC = "rating_desc_player_id_asc"
 
@@ -42,7 +42,7 @@ class BoardRow(BaseModel):
     grade_label: str
     rating: float
     event_count: int
-    delta_recent: float  # 周期内最近一次事件对该选手 rating 的贡献
+    delta_recent: float  # 最近一场该选手 Rating 的变化（AtCoder 语义；首场相对 0 起点）
 
 
 class BoardSnapshot(BaseModel):
