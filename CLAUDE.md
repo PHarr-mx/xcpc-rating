@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），Web 为 **Reflex 全栈**（`xcpc_web/`，锁 0.9.7）。已实现：选手/队伍 CRUD、正式赛导入（CLI 一步式 + Web 五步 staged）、认证与绑定审批、管理后台 7 页、榜单页（Rating 公式为 placeholder_v0，数值无业务含义）。
+校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。数据层为 **SQLite 持久化**（`xcpc_core/db/`），Web 为 **Reflex 全栈**（`xcpc_web/`，锁 0.9.7）。已实现：选手/队伍 CRUD、正式赛导入（CLI 一步式 + Web 五步 staged）、认证与绑定审批、管理后台 9 页（含比赛统一化：统一创建表单 + 赛事等级管理 + 积分认证审批）、积分页、榜单页（Rating 公式为 placeholder_v0，数值无业务含义）。
 
 技术栈：Python 3.13、pydantic v2、openpyxl、PyYAML、SQLAlchemy 2.0。原始数据以 JSON 存于 `data/raw/`（逐字可 diff、可进 Git，import 后写回归档），运行时数据在 SQLite（`data/db/xcpc.db` 业务 + `data/db/xcpc_web.db` 认证）。
 
@@ -55,7 +55,7 @@ result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
 
 ## Web 开发
 
-Reflex 应用完整运行中（`xcpc_web/`，锁版本 0.9.7）：榜单页、认证、`/profile`、管理后台 7 页（选手/队伍/比赛/用户审批/审计/在线导入）、`/about`。
+Reflex 应用完整运行中（`xcpc_web/`，锁版本 0.9.7）：榜单页、认证、`/profile`、积分页、管理后台 9 页（概览/用户审批/选手/队伍/比赛统一管理/赛事等级/积分认证/审计/在线导入）、`/about`、选手与比赛详情页。
 
 开发命令：
 
@@ -71,12 +71,14 @@ cd xcpc_web && ../.venv/bin/python -m pytest tests -v   # web 测试单独跑
 
 ### 包命名空间
 
-包为**单顶层包** `xcpc_core`（下含 `player`/`team`/`contest`/`importer`/`rating`/`db`/`utils`），由 `pyproject.toml` 安装解析，非 PYTHONPATH hack：
+包为**单顶层包** `xcpc_core`（下含 `player`/`team`/`contest`/`tier`/`importer`/`rating`/`points`/`db`/`utils`），由 `pyproject.toml` 安装解析，非 PYTHONPATH hack：
 
 - `xcpc_core/player/`、`xcpc_core/team/` → CRUD 模块
-- `xcpc_core/contest/` → 比赛与成绩（Contest/Standing，upsert）
+- `xcpc_core/contest/` → 统一比赛与成绩（Contest/Standing，upsert；赛制 icpc|ioi × 形式 player|team × 等级 tier × 双开关）
+- `xcpc_core/tier/` → 赛事等级（系数）与奖项基线 CRUD（config 种子/兜底与迁移 0003 共用）
 - `xcpc_core/importer/` → 数据导入（raw + SQLite 双写）
-- `xcpc_core/rating/` → Rating 引擎（计算器 + 事件生成）
+- `xcpc_core/rating/` → Rating 引擎（计算器 + 事件生成 + AtCoder 式重放）
+- `xcpc_core/points/` → 生涯积分（认证工作流 + 双账本 + 积分榜）
 - `xcpc_core/board/` → 榜单聚合（只读，Rating × 选手信息 → BoardSnapshot）
 - `xcpc_core/db/` → SQLite 表、session、alembic 迁移（`migrations/`，schema 变更走 `migrations.revision`）、一次性灌数据（`db.migrate`）
 - `xcpc_core/utils/` → `Plog`（双写日志）、`calendar`（赛年/赛季）
@@ -89,15 +91,15 @@ cd xcpc_web && ../.venv/bin/python -m pytest tests -v   # web 测试单独跑
 data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
   ├── players/roster.json     选手名册（一次性迁移源；日常 CRUD 走 DB）
   ├── teams/roster.json       队伍名册（同上）
-  ├── formal/{contest_id}.json 正式赛原始导入（import 写回，含 standings/award_thresholds/weight）
-  └── (训练赛 / OJ 数据源：设计中)
+  ├── formal/{contest_id}.json 正式赛原始导入（import 写回，含 standings/award_thresholds）
+  └── (通用比赛 JSON / OJ 数据源：P-U3 / 立项中)
         │
         ▼ import（xcpc_core.importer.*，raw 归档 + SQLite 双写）
-        ▼ SQLite（data/db/xcpc.db，运行时数据源）
-        ▼ Rating 计算（xcpc_core.rating.*）→ 榜单（xcpc_core.board.*）
+        ▼ SQLite（data/db/xcpc.db，运行时数据源：统一 contest + tier/awardlevel + points 双表）
+        ▼ Rating 计算（xcpc_core.rating.*，只取 counts_for_ranking 场次）→ 榜单（xcpc_core.board.*）
 ```
 
-`data/config/` 为配置：`contest_weights.yaml`（正式赛按 `contest_type`、训练赛按 `division` 的权重表）、`school.yaml`（本校 Organization 精确匹配名 + 自动建档默认入学年）。
+`data/config/` 为配置：`contest_weights.yaml`（P-U1 起作为「类型 → 等级标签/系数」的种子源，tier 表是运行时权威）、`school.yaml`（本校 Organization 精确匹配名 + 自动建档默认入学年）。
 
 ### CRUD 模块分层模式
 
@@ -117,7 +119,7 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
 
 ### 关键约定
 
-- **禁止绕过 API 直接读写存储**（SQLite 与 raw JSON 均不直接动），必须经 `xcpc_core.player.api` / `xcpc_core.team.api` / `xcpc_core.contest.api`（或 CLI，CLI 与 API 共用同一套 service 逻辑）。
+- **禁止绕过 API 直接读写存储**（SQLite 与 raw JSON 均不直接动），必须经 `xcpc_core.player.api` / `xcpc_core.team.api` / `xcpc_core.contest.api` / `xcpc_core.tier.api` / `xcpc_core.points.api`（或 CLI，CLI 与 API 共用同一套 service 逻辑）。
 - 各包以 `find_repo_root()` 定位仓库根：基于 `data/raw` 标志目录向上搜索（`xcpc_core/db/session.py`）。测试用 `db_session` fixture（内存 SQLite）注入临时数据源。
 - ID 自动生成：选手 `p001`、队伍 `t001`（全局递增，`XxxStore.next_id()`）。选手 `grade=0` 表示入学年未设置。
 - 选手软删除 = `status=left`（`mark_left`）；`delete_player` 为物理删除。
@@ -131,7 +133,7 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
   - **参考**（描述已实现系统，含代码路径）：`01-架构与数据流`、`02-选手与队伍`、`03-比赛与导入`（formal 部分）、`04-Rating与榜单`（骨架部分）、`05-Web与认证`（已上线部分）
   - **待建**（设计已定、代码未写）：`03`（训练赛/OJ）、`04`（正式公式）、`05`（详情页/P6）、`06-部署与运维`
   - **指南/计划**：`07-开发流程`（含避坑清单）、`08-路线图`（进度与剩余工作权威来源）
-- **已实现**：SQLite 持久化（16 张表）、选手/队伍 CRUD、正式赛导入全链路、rating 引擎骨架（placeholder_v0）、board 榜单聚合（写路径自动 bump data_version）、Reflex 全部已上线页面、认证与三层权限守卫。
-- **未实现**：Rating 正式公式、训练赛录入、OJ 数据源（三表零代码）、选手/比赛详情页、权重试算页、部署上线。
+- **已实现**：SQLite 持久化（20 张表，alembic 管）、选手/队伍 CRUD、正式赛导入全链路、**比赛统一化 P-U1**（tier/awardlevel 表 + contest 改造 + points 改挂 contest + `/admin/tiers` 与统一创建表单）、rating 引擎（placeholder_v0 计算器 + AtCoder 式重放引擎）、board 榜单聚合（写路径自动 bump data_version）、积分制 v1、Reflex 全部已上线页面、认证与三层权限守卫。
+- **未实现**：board 榜单切重放引擎（P-U2）、通用 JSON 导入（P-U3）、OJ 数据源（三表零代码）、权重试算页、部署上线。进度权威见 [docs/08-路线图.md](docs/08-路线图.md) 与 CONTEST_UNIFICATION_PLAN.md。
 - 原 Vue 静态站方案、v1 版 docs（DESIGN + 01–14）已删除（留 Git 历史）。
 - `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流与避坑见 `docs/07-开发流程.md`。

@@ -2,11 +2,11 @@
 
 > 定位：**参考 + 待建**。关联：[03-比赛与导入](03-比赛与导入.md) · [05-Web与认证](05-Web与认证.md) · [08-路线图](08-路线图.md)
 
-- **rating 模块**（`xcpc_core/rating/`）：把统一事件流按 `source_type` 分发到计算器，算出选手得分
+- **rating 模块**（`xcpc_core/rating/`）：把统一事件流分发到计算器，算出选手得分
 - **board 模块**（`xcpc_core/board/`）：把得分聚合成榜单快照（只读，缓存）
 
-> 实现状态（2026-09-28）：**训练赛 Rating 公式已业务定案（§2.1，AtCoder 式表现分，P-R1 实现中）**；
-> formal/OJ 暂沿用 placeholder_v0（§2.2），激励职能规划由生涯积分制（第二轨，暂缓讨论）承担。
+> 实现状态（2026-10-01）：**比赛统一化 P-U1 已落地**——事件流只取 `counts_for_ranking=True` 的统一比赛（`source_type="contest"`），权重 = tier.coefficient×100；「仅正式赛」榜单模式已随之移除。
+> 训练赛 Rating 公式定案于 §2.1（AtCoder 式表现分）；board 榜单切重放引擎为 P-U2 待办。
 
 ---
 
@@ -14,20 +14,22 @@
 
 ```
 BaseRatingCalculator (ABC)                  compute() = base × weight / 100
-├── FormalCalculator               "formal"        ✅（placeholder 公式）
-├── TrainingDispatcher → 按 format 分发  "training"  🔜 骨架已写，无数据
-│   ├── TrainingTeamXcpcCalculator    team_xcpc
-│   ├── TrainingSoloXcpcCalculator    solo_xcpc
-│   └── TrainingOiCalculator          oi
-├── OjContestCalculator            "oj_contest"    🔜 已写，永不触发（无数据源）
-└── OjPracticeCalculator           "oj_practice"   🔜 已写，永不触发（无数据源）
+├── ContestDispatcher             "contest"       ✅ 统一比赛（placeholder），按 (format, entity) 分发
+│   ├── ContestTeamCalculator         icpc×team（团队均分）
+│   ├── ContestSoloCalculator         icpc×player
+│   └── ContestOiCalculator           ioi×player
+├── FormalCalculator              "formal"        🔜 旧路径保留（无新事件写入）
+├── TrainingDispatcher            "training"      🔜 旧路径保留（无新事件写入）
+├── OjContestCalculator           "oj_contest"    🔜 已写，永不触发（无数据源）
+└── OjPracticeCalculator          "oj_practice"   🔜 已写，永不触发（无数据源）
 ```
 
 - 基类接口：`compute_base_score(event)`（抽象）+ 模板方法 `compute(event) = base * event.weight / 100`
-- `RatingEngine`（`rating/engine.py`）编排：**过滤（mode/period）→ 逐事件算分 → 按 player 聚合得分序列（按 date 升序）**
-- 权重：formal 按 `contest_type`、training 按 `division` 查 `contest_weights.yaml`（导入阶段写入事件）；OJ 用 `oj.contest_default` / `practice_default`
+- `RatingEngine`（`rating/engine.py`）编排：**过滤（period；mode 已收敛为 all）→ 逐事件算分 → 按 player 聚合得分序列（按 date 升序）**
+- 权重：统一比赛 = **tier.coefficient × 100**（事件生成阶段写入，整数）；OJ 用 `oj.contest_default` / `practice_default`（数据源待建）
+- 统一比赛占位公式按**重排名口径**：`(n_recorded − internal_rank + 1)/n_recorded × 800 + solved×30`（ioi 用 score×2，团队再按 size 均分）
 - 算法与流水线解耦：正式算法确定后只换对应子类，`meta.rating_algorithm` 版本号随之更新
-- **训练赛重放引擎**（`rating/replay.py`，§2.1 定案的实现载体）：AtCoder 式公式跨选手耦合、按时间序依赖（第 r 名的表现分依赖当时全场先验），与逐事件计算器不同，须按场次 × 日期重放全场事件流
+- **重放引擎**（`rating/replay.py`，§2.1 定案的实现载体）：AtCoder 式公式跨选手耦合、按时间序依赖（第 r 名的表现分依赖当时全场先验），与逐事件计算器不同，须按场次 × 日期重放全场事件流；P-U2 将把 board 榜单切到该引擎
 
 ## 2. 现行公式
 
@@ -61,15 +63,17 @@ g 空间平均 = 赢大分、输小分；f(1)=1200 收敛到 0——恒定打出
 
 **周期榜语义**：生涯榜全史重放；赛年/赛季榜从周期起点以全 Center 重放窗口内事件。
 
-### 2.2 formal / OJ：placeholder_v0（过渡）
+### 2.2 统一比赛 / OJ：placeholder_v0（过渡）
 
 | 计算器 | 公式 |
 |--------|------|
-| Formal | `max(0, (total_teams - rank + 1) / total_teams * 1000 + solved * 50)` |
+| 统一比赛（团队 icpc） | `(n_recorded − internal_rank + 1)/n_recorded × 800 + solved × 30`，按 size 均分 |
+| 统一比赛（个人 icpc） | 同上不均分 |
+| 统一比赛（ioi） | `... × 800 + score × 2` |
 | OJ 比赛 | `max(0, delta)` |
 | OJ 做题 | `rating_numeric * 0.5 + solve_count * 2` |
 
-（原 Training 三个计算器随 §2.1 上线后退役。）数值无业务含义；正式赛的激励职能由「生涯积分制」（第二轨，暂缓讨论，见 [08-路线图](08-路线图.md) §4）规划承担，届时 formal/OJ 是否保留 rating 由该定案一并处置。
+数值无业务含义；积分激励由「生涯积分制」（第二轨）承担，已改挂统一 contest（积分公式见 CONTEST_UNIFICATION_PLAN §2.6）。
 
 ## 3. 公式方向定案记录（原四期定案清单）
 
@@ -93,8 +97,9 @@ g 空间平均 = 赢大分、输小分；f(1)=1200 收敛到 0——恒定打出
 
 | 模式 | `mode` | 数据源 |
 |------|--------|--------|
-| 仅正式赛 | `formal_only` | `source_type = formal` |
-| 全部数据 | `all` | formal + training + oj_* |
+| 全部数据 | `all` | `counts_for_ranking=True` 的统一比赛（+ 将来 oj_*） |
+
+> 「仅正式赛」模式（`formal_only`）随比赛统一化移除（2026-10-01）：逐场 `counts_for_ranking` 开关取代 `source_type` 过滤，URL 中的旧参数被白名单忽略。
 
 | 维度 | `period_type` | 定义 |
 |------|---------------|------|

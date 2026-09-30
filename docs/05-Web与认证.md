@@ -5,8 +5,8 @@
 Reflex 应用（`xcpc_web/`，锁 0.9.7）。Web 层只做 UI 与状态：**不写 SQL、不承载业务规则**，
 State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 state var」。
 
-> 实现状态：榜单页、认证、`/profile`、管理后台 7 页（含在线导入五步）均已上线；
-> 选手/比赛详情页与权重试算页待建。
+> 实现状态：榜单页、认证、`/profile`、管理后台 9 页（含在线导入五步与比赛统一化新页）、
+> 积分页（认证提交 + 双榜）、选手/比赛详情页均已上线；权重试算页待建。
 
 ---
 
@@ -40,7 +40,10 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `/admin/users` | 用户与绑定审批 | admin | ✅ |
 | `/admin/players` | 选手 CRUD | admin | ✅ |
 | `/admin/teams` | 队伍 CRUD | admin | ✅ |
-| `/admin/contests` | 比赛列表与删除 | admin | ✅ |
+| `/admin/contests` | 统一比赛管理：创建表单（赛制/形式/等级/双开关/计分方式）+ 列表与删除（P-U1） | admin | ✅ |
+| `/admin/tiers` | 赛事等级（系数）+ 奖项基线分，同页 CRUD（P-U1） | admin | ✅ |
+| `/admin/points` | 积分认证审批（场次创建已并入比赛管理；P-U1） | admin | ✅ |
+| `/points` | 生涯积分：提交认证（按 scoring 切换表单）+ 我的认证 + 个人/队伍双榜 | member | ✅ |
 | `/admin/audit` | 审计日志筛选（只读） | admin | ✅ |
 | `/admin/import` | xlsx 在线导入五步 | admin | ✅ |
 | `/players/{player_id}` | 选手详情：档案 + OJ 外链 + Rating 曲线 + 参赛记录；绑定本人显示「编辑我的资料」 | guest | ✅ 2026-09-11 |

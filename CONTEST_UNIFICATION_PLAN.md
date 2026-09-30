@@ -1,6 +1,8 @@
-# 比赛统一化改造方案（评审稿）
+# 比赛统一化改造方案（P-U1 已实施）
 
-> 2026-09-30 · 按用户设想细化，**审核通过后动工**；定案后并入 docs/03、04 并删除本稿。
+> 2026-09-30 评审定稿（D1–D6 全部拍板）→ **2026-10-01 P-U1 已落地并提交**（提交 `bd5f0b4`，真库已升级迁移 `0003`，core 195 + web 106 全绿，浏览器验收通过）。
+> 进度：**P-U1 数据与管理端 ✅**；P-U2 计分接线、P-U3 通用 JSON 导入待做。
+> 全部期次完成后本稿并入 docs/03、04 并删除。
 
 ## 1. 目标与对既有决策的修订
 
@@ -116,11 +118,17 @@
 
 ## 7. 实施分期
 
-| 期 | 内容 | 估量 |
-|----|------|------|
-| **P-U1 数据与管理端** | tier/awardlevel 表 + 迁移（含存量映射）+ 管理页；contest 表改造 + 统一创建表单；claim/entry 改挂 contest；既有测试迁移 | ~1 天 |
-| **P-U2 计算接线** | compute_points 统一（formula/award_only × 系数）；导入/认证 → 流水；counts_for_ranking → 事件流 + replay；/points 表单按 scoring 切换；详情页标签 | ~1 天 |
-| **P-U3 通用 JSON 导入** | 通用 JSON 模板导入（含姓名匹配/自动建队），原训练赛录入方案并入 | ~半天 |
+| 期 | 内容 | 估量 | 状态 |
+|----|------|------|------|
+| **P-U1 数据与管理端** | tier/awardlevel 表 + 迁移（含存量映射）+ 管理页；contest 表改造 + 统一创建表单；claim/entry 改挂 contest；既有测试迁移 | ~1 天 | ✅ 2026-10-01（`bd5f0b4`） |
+| **P-U2 计分接线** | compute_points 统一（formula/award_only × 系数）；导入/认证 → 流水；counts_for_ranking → 事件流 + replay；/points 表单按 scoring 切换；详情页标签 | ~1 天 | 部分随 P-U1 完成（计分公式与事件流过滤已接线），余 board 切 replay 引擎 + 系数进时间加权 |
+| **P-U3 通用 JSON 导入** | 通用 JSON 模板导入（含姓名匹配/自动建队），原训练赛录入方案并入 | ~半天 | 未开始 |
+
+P-U1 落地备注：
+- 迁移 `0003_unify_contest` 为手写重建式——运行时连接 `PRAGMA foreign_keys=ON` 且事务内 pragma 是 no-op，rename/drop 被子表引用的父表会被隐式 DELETE 卡住；故先把五张表数据读进内存、按「子表→父表」drop、再建新表回插。downgrade 只还原结构不回搬数据。
+- 排名口径已按 D1 进 `rating/events.py`：`counts_for_ranking` 过滤 + 内部重排名（并列取平均，payload 带 `internal_rank`/`n_recorded`）+ `<2` 实体护栏；`BoardMode` 收敛为 `all`（「仅正式赛」UI/URL 移除）。
+- 存量映射（D6）已验证：省赛 → ICPC 省赛 0.7（计排名不计积分不申报）；测试积分场 → `points_{id}`（计积分可申报，tier=未分级）。
+- `/points` 认证表单按 scoring 切换与详情页标签已随 P-U1 完成（原列在 P-U2）。
 
 存量数据策略（数据量小）：省赛记录保留迁移；测试积分场与流水清空重灌。
 
