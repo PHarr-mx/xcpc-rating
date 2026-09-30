@@ -102,5 +102,4 @@ def player_detail() -> rx.Component:
                 _detail_body(),
                 rx.spacer(),
             ),
-        )
-    )
+        ), section="rank", subsection="board")

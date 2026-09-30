@@ -37,6 +37,8 @@
 
 ### Reflex 0.9.7 要点
 - State 链手工构建：`_reflex_internal_init=True` + 父链（如 LocalAuthState→AuthState→目标 State）。
+- **主题配置走 `rxconfig.py` 的 `rx.plugins.RadixThemesPlugin(theme=rx.theme(...))`**：`App(theme=...)` 在 0.9.0 已弃用且实测不生效；主题改动需重启服务（rxconfig 不热重载），app 模块改动对部分路由 HMR 会失效（"No module update found"），也需重启。
+- **布局外壳**（2026-09-30 定案）：顶栏四大类（榜单/积分/个人资料/系统管理，按身份条件渲染）+ 恒显示侧边栏（类内小项）；各页显式传 `page_shell(section=, subsection=)` 字面量做高亮，「我的认证」在个人资料页。
 - **动态路由参数不能声明同名 state var**（`DynamicRouteArgShadowsStateVarError`），从 `self.router.page.params` 读；`is_self` 等时敏判断也要直读 params 而非 on_load 设置的 var。
 - Var 约束：不能 iterate/`or`/`bool()` 一个 Var；列表/字典视图在 State 里**预计算成 view dict**；`rx.cond` 构建时两个分支都求值（`href=None` 会炸，用 `""` 哨兵）；计算属性要 `cache=False`。
 - `rx.redirect(path, replace=True)` = 客户端导航（URL 同步用）。

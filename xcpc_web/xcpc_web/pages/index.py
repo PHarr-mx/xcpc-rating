@@ -14,5 +14,4 @@ def index() -> rx.Component:
             board_table(),
             spacing="6",
             width="100%",
-        ),
-    )
+        ), section="rank", subsection="board")

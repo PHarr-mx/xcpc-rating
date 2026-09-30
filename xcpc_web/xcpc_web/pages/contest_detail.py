@@ -31,5 +31,4 @@ def contest_detail() -> rx.Component:
                 ),
                 rx.spacer(),
             ),
-        )
-    )
+        ), section="rank", subsection="board")

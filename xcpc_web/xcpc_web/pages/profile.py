@@ -1,8 +1,9 @@
-"""个人资料页：绑定申请 + 自助字段编辑。"""
+"""个人资料页：绑定申请 + 自助字段编辑 + 我的认证（个人中心一站式）。"""
 
 import reflex as rx
 
 from xcpc_web.components.layout import page_shell
+from xcpc_web.states.points import STATUS_LABELS, PointsState
 from xcpc_web.states.profile import OJ_PLATFORMS, ProfileState
 
 
@@ -222,6 +223,61 @@ def _self_edit() -> rx.Component:
     )
 
 
+def _my_claims() -> rx.Component:
+    """我的认证：本人/所在队伍提交的认证记录与审核状态（积分制）。"""
+    return rx.card(
+        rx.vstack(
+            rx.heading("我的认证", size="5"),
+            rx.text(
+                "在积分页提交的认证记录；队伍认证为全队共享一条记录。",
+                size="2",
+                color_scheme="gray",
+            ),
+            rx.cond(
+                PointsState.my_claims.length() > 0,
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            rx.table.column_header_cell("场次"),
+                            rx.table.column_header_cell("主体"),
+                            rx.table.column_header_cell("解题/得分"),
+                            rx.table.column_header_cell("名次"),
+                            rx.table.column_header_cell("状态"),
+                        ),
+                    ),
+                    rx.table.body(
+                        rx.foreach(
+                            PointsState.my_claims,
+                            lambda claim: rx.table.row(
+                                rx.table.cell(claim["event_title"]),
+                                rx.table.cell(claim["owner_label"]),
+                                rx.table.cell(claim["value"]),
+                                rx.table.cell(claim["rank"]),
+                                rx.table.cell(
+                                    rx.badge(
+                                        claim["status_label"],
+                                        color_scheme=rx.cond(
+                                            claim["status"] == "approved",
+                                            "green",
+                                            rx.cond(
+                                                claim["status"] == "rejected", "red", "gray"
+                                            ),
+                                        ),
+                                    )
+                                ),
+                            ),
+                        ),
+                    ),
+                    width="100%",
+                ),
+                rx.text("还没有提交过认证（前往积分页提交）", color_scheme="gray", size="2"),
+            ),
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
 def profile() -> rx.Component:
     """个人资料页。"""
     return page_shell(
@@ -231,10 +287,10 @@ def profile() -> rx.Component:
                 rx.heading("个人资料", size="7"),
                 rx.cond(ProfileState.is_bound, _bound_info(), _binding_form()),
                 rx.cond(ProfileState.is_bound, _self_edit()),
+                rx.cond(ProfileState.is_bound, _my_claims()),
                 spacing="6",
                 width="100%",
-                max_width="40em",
+                max_width="48em",
             ),
             rx.text("请先登录…", size="3"),
-        ),
-    )
+        ), section="profile", subsection="profile")

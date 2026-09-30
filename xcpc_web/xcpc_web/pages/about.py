@@ -72,5 +72,4 @@ def about() -> rx.Component:
             spacing="5",
             width="100%",
             align_items="start",
-        ),
-    )
+        ), section="rank", subsection="about")

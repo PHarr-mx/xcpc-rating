@@ -11,7 +11,14 @@ config = rx.Config(
     db_url=f"sqlite:///{_db_path}",
     plugins=[
         rx.plugins.SitemapPlugin(),
-        rx.plugins.RadixThemesPlugin(),
+        rx.plugins.RadixThemesPlugin(
+            theme=rx.theme(
+                appearance="dark",
+                accent_color="violet",
+                gray_color="mauve",
+                radius="medium",
+            )
+        ),
         rx.plugins.TailwindV4Plugin(),
     ]
 )

@@ -116,4 +116,4 @@ def _content() -> rx.Component:
 
 
 def admin_import() -> rx.Component:
-    return page_shell(rx.cond(AdminImportState.is_admin, _content(), rx.text("无权访问，请以管理员身份登录。", size="3", color_scheme="gray")))
+    return page_shell(rx.cond(AdminImportState.is_admin, _content(), rx.text("无权访问，请以管理员身份登录。", size="3", color_scheme="gray")), section="admin", subsection="import")

@@ -91,55 +91,6 @@ def _submit_form() -> rx.Component:
     )
 
 
-def _my_claims_table() -> rx.Component:
-    return rx.card(
-        rx.vstack(
-            rx.heading("我的认证", size="5"),
-            rx.cond(
-                PointsState.my_claims.length() > 0,
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("场次"),
-                            rx.table.column_header_cell("主体"),
-                            rx.table.column_header_cell("解题/得分"),
-                            rx.table.column_header_cell("名次"),
-                            rx.table.column_header_cell("状态"),
-                        ),
-                    ),
-                    rx.table.body(
-                        rx.foreach(
-                            PointsState.my_claims,
-                            lambda claim: rx.table.row(
-                                rx.table.cell(claim["event_title"]),
-                                rx.table.cell(claim["owner_label"]),
-                                rx.table.cell(claim["value"]),
-                                rx.table.cell(claim["rank"]),
-                                rx.table.cell(
-                                    rx.badge(
-                                        claim["status_label"],
-                                        color_scheme=rx.cond(
-                                            claim["status"] == "approved",
-                                            "green",
-                                            rx.cond(
-                                                claim["status"] == "rejected", "red", "gray"
-                                            ),
-                                        ),
-                                    )
-                                ),
-                            ),
-                        ),
-                    ),
-                    width="100%",
-                ),
-                rx.text("还没有提交过认证", color_scheme="gray", size="2"),
-            ),
-            width="100%",
-        ),
-        width="100%",
-    )
-
-
 def _individual_board() -> rx.Component:
     return rx.card(
         rx.vstack(
@@ -242,7 +193,7 @@ def points_page() -> rx.Component:
                 _feedback(),
                 rx.cond(
                     PointsState.is_bound,
-                    rx.fragment(_submit_form(), _my_claims_table()),
+                    _submit_form(),
                     rx.callout(
                         "尚未绑定选手：绑定后才能提交认证（前往个人资料页绑定）。",
                         icon="info",
@@ -256,5 +207,4 @@ def points_page() -> rx.Component:
                 max_width="100em",
             ),
             rx.text("请先登录。", size="3", color_scheme="gray"),
-        ),
-    )
+        ), section="points", subsection="individual")

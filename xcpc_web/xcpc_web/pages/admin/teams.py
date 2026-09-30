@@ -215,5 +215,4 @@ def admin_teams() -> rx.Component:
                 max_width="90em",
             ),
             rx.text("无权访问，请以管理员身份登录。", size="3", color_scheme="gray"),
-        ),
-    )
+        ), section="admin", subsection="teams")

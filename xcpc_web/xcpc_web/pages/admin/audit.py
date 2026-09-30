@@ -138,5 +138,4 @@ def admin_audit() -> rx.Component:
                 max_width="100em",
             ),
             rx.text("无权访问，请以管理员身份登录。", size="3", color_scheme="gray"),
-        ),
-    )
+        ), section="admin", subsection="audit")
