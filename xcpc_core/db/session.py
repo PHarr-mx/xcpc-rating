@@ -60,13 +60,3 @@ def make_session_factory(url: str | None = None, *, echo: bool = False) -> tuple
     engine = create_db_engine(url, echo=echo)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     return engine, factory
-
-
-def create_all(url: str | None = None, *, echo: bool = False) -> None:
-    """（开发用）建全部表。schema 稳定后再引入 alembic 迁移。"""
-    from xcpc_core.db.base import Base
-    from xcpc_core.db import tables as _tables  # noqa: F401
-
-    engine = create_db_engine(url, echo=echo)
-    Base.metadata.create_all(engine)
-    return None

@@ -1,8 +1,10 @@
-"""一次性把 data/raw 现有数据灌入 SQLite（幂等，可反复重跑）。
+"""把 data/raw 现有数据灌入 SQLite（幂等，可反复重跑）。
 
 用法：
     uv run python -m xcpc_core.db.migrate
 
+- schema 由 alembic 管（``db.migrations.run_migrations``）：全新库建表升级到
+  head，alembic 引入前的存量库自动 stamp，已升级的库为 no-op
 - 读 data/raw/players/roster.json、teams/roster.json、formal/*.json
 - 按主键 upsert：已存在的选手/队伍更新，比赛则删旧成绩后重写
 - 现有 ID（p001/t001）原样保留；created_at 缺失填迁移当日
@@ -17,7 +19,8 @@ from pathlib import Path
 from xcpc_core.contest.api import save_contest
 from xcpc_core.contest.models import ContestCreate, Standing
 from xcpc_core.contest.store import ContestStore
-from xcpc_core.db.session import create_all, default_db_url, find_repo_root, make_session_factory
+from xcpc_core.db.migrations import run_migrations
+from xcpc_core.db.session import default_db_url, find_repo_root, make_session_factory
 from xcpc_core.player.models import Player
 from xcpc_core.player.store import PlayerStore
 from xcpc_core.team.models import Team
@@ -115,7 +118,7 @@ def migrate_formal_contests(session, *, plog: Plog, repo_root: Path) -> int:
 def migrate(*, repo_root: Path | None = None) -> None:
     root = repo_root or find_repo_root()
     url = default_db_url(repo_root=root)
-    create_all(url=url)
+    run_migrations(url=url)
     engine, factory = make_session_factory(url=url)
     plog = Plog(name="xcpc-migrate")
     try:

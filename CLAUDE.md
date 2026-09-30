@@ -78,7 +78,7 @@ cd xcpc_web && ../.venv/bin/python -m pytest tests -v   # web 测试单独跑
 - `xcpc_core/importer/` → 数据导入（raw + SQLite 双写）
 - `xcpc_core/rating/` → Rating 引擎（计算器 + 事件生成）
 - `xcpc_core/board/` → 榜单聚合（只读，Rating × 选手信息 → BoardSnapshot）
-- `xcpc_core/db/` → SQLite 表、session、一次性迁移
+- `xcpc_core/db/` → SQLite 表、session、alembic 迁移（`migrations/`，schema 变更走 `migrations.revision`）、一次性灌数据（`db.migrate`）
 - `xcpc_core/utils/` → `Plog`（双写日志）、`calendar`（赛年/赛季）
 
 `import xcpc_core.player`、`from xcpc_core.utils import Plog` 可用。后续 `xcpc_web/`（Reflex）为另一顶层包，**只依赖 `xcpc_core`，不反向依赖**。
