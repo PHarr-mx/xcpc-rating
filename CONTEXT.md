@@ -2,27 +2,24 @@
 
 > 最近更新：2026-09-26 · 本文记录「最近一次盘点对话」的结论，供下次打开快速恢复；进度本体见 [PROGRESS.md](PROGRESS.md)，计划与剩余工作见 [docs/08-路线图.md](docs/08-路线图.md)。
 
-## 项目当前状态（2026-09-26）
+## 项目当前状态（2026-09-28）
 
-- **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期（业务补齐）、五期（上线）未开始
+- **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期（业务补齐）进行中：**公式定案 + P-R1 已落地**，训练赛录入未开始
 - **Web P0–P5 全部完成**：榜单 `/`、认证、`/profile`、管理后台 P4a–P4d、`/about`、`/players/{id}`、`/contests/{id}`、URL query 同步、赛年/赛季筛选
-- **旁路二项全清**（2026-09-26）：alembic 迁移体系落地（基线 `0001_baseline`，真库已 stamp）+ formal 导入 DTO 前置校验；core 138 + web 94 全绿
-- Rating 仍为 `placeholder_v0`（名次线性分 + 做题加成，数值无业务含义）——这是四期要解决的核心
+- **四期业务定案完成（2026-09-28 拍板）**：训练赛 Rating = **AtCoder 式表现分体系**（规格 docs/04 §2.1）——同队三人同分、负分照实显示、仅训练赛生效；**P-R1 重放引擎已落地**（core 159 + web 94 全绿）
+- **生涯积分制（第二轨）暂缓**：只累加的贡献分（正式赛获奖/参赛 + 训练赛参与），讨论底稿 RATING_FORMULA_PLAN.md §9，用户指示另行讨论
+- 旁路二项已清（alembic + DTO 前置校验，均已提交）；formal/OJ 仍为 placeholder_v0
 
-## 最近几次会话做了什么（2026-09-15 → 09-26）
+## 最近几次会话做了什么（2026-09-26 → 09-28）
 
-1. **alembic 引入（旁路项一）**：
-   - `xcpc_core/db/migrations/`：`env.py`（URL 程序化注入，`render_as_batch=True`）+ `0001_baseline`（16 张表，autogenerate 后人工核对）+ `revision.py`（`uv run python -m xcpc_core.db.migrations.revision -m "..."` 生成后续迁移）。
-   - `run_migrations(url)` 自愈式接线：全新库 `upgrade head`；存量库（有 `meta` 表无 `alembic_version`）自动 `stamp head`；`db/migrate.py` 已改用它，`session.create_all` 删除。
-   - 守护测试 4 条（`db/tests/test_migrations.py`）：内存库拒绝、fresh upgrade、**漂移检测**（`compare_metadata` 零差异——改 `tables.py` 不写迁移直接红）、存量库 stamp 幂等。
-   - 真库 `data/db/xcpc.db` 已 stamp 到 `0001_baseline`（17 张表含 alembic_version，数据完好）。
-   - 范围决策：**只接管业务库 xcpc.db**；认证库 `xcpc_web.db`（Reflex SQLModel 独立 metadata）四期不碰，继续 create_all。
-2. **formal 导入 DTO 前置校验（旁路项二）**：
-   - Pydantic 层：解析结果四不变量（total_teams/total_problems>0、本校队伍非空、有获奖）进 `XcpcioParsedContest` model_validator，`parse_xcpcio_xlsx` 尾部过程式检查删除；`FormalImportParams` 加纯校验——`contest_type` 非空白、`contest_id` 非空白且禁 `/` `\` `..`（此前 contest_id 直接 f-string 拼进 `raw/formal/{id}.json`，存在路径穿越窟窿，已堵上）。
-   - 入口层：contest_type 权重表查证前置到 `import_formal_xcpcio_xlsx` 与 `stage_formal_xlsx` 的**最前**（打开任何文件之前），报错列出全部合法类型及标签（`weights.load_formal_types` 新增）；staged 的 `_contest_meta` 改为接收已解析权重（原 `parsed` 参数本来就没用）。
-   - 设计要点：**YAML 依赖的校验不进 Pydantic validator**——直接构造（全仓库唯一构造方式）没有 context 可传 repo_root，validator 裸调 find_repo_root 会破坏临时仓库测试隔离；故纯校验进 DTO、配置校验进入口（repo_root 注入约定不变）。
-   - 测试 16 条（`importer/tests/test_import_validation.py`），含「前置性证明」：传不存在的 xlsx 路径 + 错误 type，断言抛"未知 contest_type"而非 FileNotFoundError。
-3. **上次遗留的 `pelican-riding-bicycle.svg` 已消失**（未跟踪文件，无需处理）。
+1. **alembic 引入（旁路项一，已提交 `bbea601`）**：`db/migrations/`（基线 `0001_baseline`）+ `run_migrations` 自愈式接线 + 4 条守护测试（漂移检测关键）；真库已 stamp。**改 tables.py 必须配迁移，漏写被 `test_models_match_migrations_no_drift` 拦下**。
+2. **formal 导入 DTO 前置校验（旁路项二，已提交 `94d0c7a`）**：解析结果四不变量进 model_validator；`contest_id` 防路径穿越（原直接拼 raw 文件名的窟窿）；contest_type 权重表查证前置到打开文件前、报错列出合法类型；16 条测试。
+3. **Rating 公式定案 + P-R1（本次会话）**：
+   - 拍板（用户）：候选 A（AtCoder 式）、同队三人同分、负分照实显示、仅训练赛生效、Center 统一 800 暂不分档；**队伍 APerf = 队伍自身历史队 Perf 加权平均（非队员均值）→ 换员即新队先验重置**。
+   - 实现：`rating/formula_params.py`（常量集中）+ `formula.py`（solve_perf 二分 / 0.9^i×权重加权平均 / f(n) / g 变换）+ `replay.py`（`AtcoderReplayEngine`：场次×日期重放、打星参与方程不入历史、并列名次取平均、周期窗口全 Center 重放）+ `ReplayEventScore` 模型；21 条新测试（含闭式解与收敛数值断言）。
+   - 文档：规格并入 docs/04 §2.1、§3 定案记录表更新、路线图 §3/§4 勾选；RATING_FORMULA_PLAN.md 保留为积分制讨论底稿（§9 暂缓）。
+
+更早（2026-09-10 → 09-15）：三期关闭、GAP 评估并入路线图、榜单 URL query 同步、data_version 写路径自动 bump、`/about`、P5 详情页（players/contests + recharts）、docs 九篇重构、赛年/赛季筛选真实生效、测试盲区补齐、推送 `90b0cef..aa412c0`。
 
 更早（2026-09-10 → 09-15）：三期关闭、GAP 评估并入路线图、榜单 URL query 同步、data_version 写路径自动 bump、`/about`、P5 详情页（players/contests + recharts）、docs 九篇重构、赛年/赛季筛选真实生效、测试盲区补齐、推送 `90b0cef..aa412c0`。
 
@@ -52,14 +49,22 @@
 - openpyxl xcpcio 格式：A1 标题、第 2 行表头、第 3 行起数据；需 A–H 连续题列；只有获奖本校队进 standings。
 - web 导入测试需要把 `contest_weights.yaml` **和** `school.yaml` 都拷进临时仓库。
 
-## 下一步（docs/08-路线图 §3）
+## 下一步（docs/08-路线图 §3 第四步，按建议顺序）
 
-1. **四期第一步 = 业务定案（写代码前必须拍板）**：① Rating 正式公式（加权 Elo / 队内分摊 / 时间衰减 / 初始分与封顶，见 docs/04 §2–3）；② 训练赛成绩分摊规则（均分 vs 按贡献）。助手已提议产出「公式决策稿」：2–3 个候选公式 + 用现有省赛数据算示例值 + 优劣与实现成本，供用户评审。
-2. **四期实现（依赖定案；动表结构已有 alembic 兜底）**：计算器替换（版本号 + 缓存联动 + 测试重写）→ 训练赛录入（导入入口 + `load_training_weight` + raw/training 归档）→ `/admin/rating` 试算页（P6，试算不落库）→ 图表升级。
-3. **五期（四期后）**：先定**注册限制**（邀请码 / 域名白名单，公网前必须），再做部署三件套（生产 rxconfig、`reflex export` + rsync、systemd、Caddy、备份 cron，清单见 docs/06 §7——schema 迁移步骤已补入）。
-4. 挂起的 12 条开放决策见 docs/08 §4，其中仅 #1 公式、#2 分摊、#4 注册限制是阻塞项。
+1. **训练赛录入（四期第 2 项）**：导入入口 + `load_training_weight` + events training 分支 + raw/training 归档（见 docs/03 §3.4）；这是 P-R2 接线的前置——没有训练赛事件，重放引擎无数据可算。
+2. **P-R2 接线**：board 训练赛榜走 `AtcoderReplayEngine`（生涯/赛年/赛季三档）+ 选手详情页曲线换 rating_after 语义 + `meta.rating_algorithm` 升版。
+3. **P-R4 试算页 `/admin/rating`**：两轨参数试算（不落库）。
+4. **积分制（第二轨，暂缓）**：规格草案在 RATING_FORMULA_PLAN.md §9（基线值/参与门槛/起算窗口三个子决策未拍），等用户发起再议。
+5. 挂起的开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项，其余不阻塞。
 
-当前分叉点：**「公式决策稿」是下一个动作**（旁路已清空），等用户拍板后动工。
+## 关键技术结论（下次开发直接复用，避免重踩）
+
+### 训练赛 Rating（AtCoder 式，2026-09-28 定案）
+- **改公式参数只动 `rating/formula_params.py`**（Center=800、尺度 400/6、衰减 0.9、首场膨胀 1.5、f 满额 1200）。
+- 引擎是**重放式**（跨选手耦合、时间序依赖），不能塞进逐事件 `BaseRatingCalculator` 接口；消费入口统一 `AtcoderReplayEngine.compute_series(events, period=)`，输出 `ReplayEventScore{date, perf, rating_after}`。
+- 事件要求：`event_id` 前缀 = contest_id；payload 必须有合法 `rank`；队伍成员名次必须一致（违反直接抛错）；打星 = `payload.unofficial=True`。
+- 队伍先验 = **队伍自身历史**（team_id 分组），换员即新队（member_key 约定）先验回 Center；个人历史跨队累计、组队/solo 混流。
+- 周期榜语义：窗口内以全 Center 重放（「这个赛年若从零开始」），与生涯全史重放并存。
 
 ## 常用命令速查
 

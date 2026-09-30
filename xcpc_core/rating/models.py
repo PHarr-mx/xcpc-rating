@@ -57,6 +57,14 @@ class EventScore(BaseModel):
     score: float
 
 
+class ReplayEventScore(BaseModel):
+    """重放引擎（AtCoder 式）的单场输出：本场表现分（同队三人相同）+ 累计到本场后的个人 Rating。"""
+
+    date: date
+    perf: float
+    rating_after: float
+
+
 class PlayerScore(BaseModel):
     player_id: str
     rating: float
