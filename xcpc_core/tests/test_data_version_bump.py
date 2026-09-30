@@ -134,22 +134,27 @@ def test_board_cache_invalidated_by_write(monkeypatch):
 
     with factory() as s:
         _make_player_service(s).create_player(PlayerCreate(name="张三", handle="zs", grade=2023))
+        _make_player_service(s).create_player(PlayerCreate(name="李四", handle="ls", grade=2023))
         _make_contest_service(s).save_contest(ContestCreate(
-            id="c1", title="测试赛", date=date(2026, 5, 1), contest_type="icpc_school",
-            total_teams=10, standings=[Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"])],
+            id="c1", title="测试赛", date=date(2026, 5, 1),
+            standings=[
+                Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
+                Standing(team_name="二队", rank=2, solved=4, player_ids=["p002"]),
+            ],
         ))
 
     period = PeriodFilter()
     snap1 = board_api.board(mode="all", period=period)
-    assert [row.player_id for row in snap1.rows] == ["p001"]
+    assert [row.player_id for row in snap1.rows] == ["p001", "p002"]
     assert board_api.board(mode="all", period=period) is snap1  # 数据未变 → 缓存命中
 
     with factory() as s:
         _make_player_service(s).mark_left("p001")  # 离队 → 不再出现在榜单
+        _make_player_service(s).mark_left("p002")
 
     snap2 = board_api.board(mode="all", period=period)
     assert snap2.rows == []
-    assert snap2.meta.data_version == snap1.meta.data_version + 1
+    assert snap2.meta.data_version == snap1.meta.data_version + 2
 
 
 def test_meta_row_created_with_default_algorithm(db_session):

@@ -39,16 +39,22 @@ def _submit_form() -> rx.Component:
         rx.vstack(
             rx.heading("提交认证", size="5"),
             rx.text(
-                "选择积分场次，填写解题数/得分与名次；队伍赛需先选择所属队伍（本人须为现役成员）。",
+                "选择计积分的比赛提交认证；队伍赛需先选择所属队伍（本人须为现役成员）。"
+                "按名次计分的比赛填解题数与名次，「仅按奖项」的比赛直接选获奖等级。",
                 size="2",
                 color_scheme="gray",
             ),
             rx.select(
-                PointsState.event_options,
-                value=PointsState.claim_event_id,
-                on_change=PointsState.set_claim_event_id,
-                placeholder="选择积分场次",
+                PointsState.contest_options,
+                value=PointsState.claim_contest,
+                on_change=PointsState.set_claim_contest,
+                placeholder="选择比赛",
                 width="100%",
+            ),
+            rx.cond(
+                PointsState.selected_hint != "",
+                rx.text(PointsState.selected_hint, size="2", color_scheme="gray"),
+                rx.fragment(),
             ),
             rx.cond(
                 PointsState.selected_is_team,
@@ -61,21 +67,32 @@ def _submit_form() -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-            rx.hstack(
-                rx.input(
-                    value=PointsState.claim_value,
-                    on_change=PointsState.set_claim_value,
-                    placeholder="解题数/得分（≥1）",
-                    width="50%",
+            # 表单按计分方式切换：award_only 选奖项；formula 填解题数/名次
+            rx.cond(
+                PointsState.selected_is_award_only,
+                rx.select(
+                    PointsState.award_options,
+                    value=PointsState.claim_award,
+                    on_change=PointsState.set_claim_award,
+                    placeholder="选择获奖等级",
+                    width="100%",
                 ),
-                rx.input(
-                    value=PointsState.claim_rank,
-                    on_change=PointsState.set_claim_rank,
-                    placeholder="名次",
-                    width="50%",
+                rx.hstack(
+                    rx.input(
+                        value=PointsState.claim_value,
+                        on_change=PointsState.set_claim_value,
+                        placeholder="解题数/得分（≥1）",
+                        width="50%",
+                    ),
+                    rx.input(
+                        value=PointsState.claim_rank,
+                        on_change=PointsState.set_claim_rank,
+                        placeholder="名次",
+                        width="50%",
+                    ),
+                    width="100%",
+                    spacing="3",
                 ),
-                width="100%",
-                spacing="3",
             ),
             rx.input(
                 value=PointsState.claim_note,
@@ -181,7 +198,8 @@ def points_page() -> rx.Component:
                 rx.vstack(
                     rx.heading("生涯积分", size="7"),
                     rx.text(
-                        "积分 = 100 × (解题数/得分 ÷ 全场最高) × 名次百分位，只累加不衰减；"
+                        "按名次计分：100 × (解题数/得分 ÷ 全场最高) × 名次百分位 × 赛事等级系数；"
+                        "仅按奖项计分：奖项基线分 × 赛事等级系数。积分只累加不衰减，"
                         "提交认证后由 admin 审核记分。",
                         size="2",
                         color_scheme="gray",

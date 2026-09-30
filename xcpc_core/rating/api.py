@@ -67,8 +67,6 @@ def player_event_history(
         owns = True
     try:
         events = [e for e in build_events_from_contests(resolved) if e.player_id == player_id]
-        if mode == "formal_only":
-            events = [e for e in events if e.source_type == "formal"]
         if not events:
             return []
 

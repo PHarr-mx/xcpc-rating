@@ -51,18 +51,14 @@ def _save_contest(
     contest_id: str,
     date_: date,
     standings: list[Standing],
-    weight: int = 70,
-    total_teams: int = 86,
+    tier_id: int | None = None,
 ) -> None:
     contest_api.save_contest(ContestCreate(
         id=contest_id,
         title=f"测试比赛 {contest_id}",
         date=date_,
-        contest_type="icpc_provincial",
-        format="team_xcpc",
-        total_teams=total_teams,
+        tier_id=tier_id,
         school_teams_count=len(standings),
-        weight=weight,
         standings=standings,
     ))
 
@@ -101,8 +97,9 @@ def test_board_basic_structure_and_rank_ties(db_session):
     assert [r.player_id for r in snap.rows] == ["p001", "p002", "p003", "p004"]
     # 同队同分 → 竞赛排名 1,1,3,3（同分同 rank、下一名跳号）
     assert [r.rank for r in snap.rows] == [1, 1, 3, 3]
-    assert snap.rows[0].rating == pytest.approx(980.0)
-    assert snap.rows[2].rating == pytest.approx(936.86, abs=0.01)
+    # 占位公式（统一比赛）：(n_recorded − internal_rank + 1)/n_recorded × 800 + solved×30，再按队员数均分
+    assert snap.rows[0].rating == pytest.approx(((2 - 1 + 1) / 2 * 800 + 8 * 30) / 2)  # 520.0
+    assert snap.rows[2].rating == pytest.approx(((2 - 2 + 1) / 2 * 800 + 7 * 30) / 2)  # 305.0
     # 展示字段
     assert snap.rows[0].name == "张三"
     assert snap.rows[0].grade_label == "2024级"
@@ -134,21 +131,23 @@ def test_board_excludes_left_players(db_session):
 
 
 def test_board_period_filter_and_delta_recent(db_session):
-    _save_players(db_session, _player("p001", name="张三"))
-    # 两场比赛，rank 不同 → 得分不同，便于区分 delta_recent
+    _save_players(db_session, _player("p001", name="张三"), _player("p002", name="李四"))
+    # 两场比赛，rank 不同 → 得分不同，便于区分 delta_recent（各 2 队过「实体 ≥ 2」护栏）
     _save_contest(
         contest_id="c_a",
         date_=date(2026, 3, 15),
-        weight=100,
-        total_teams=10,
-        standings=[Standing(team_id="t001", team_name="一队", rank=1, solved=5, player_ids=["p001"])],
+        standings=[
+            Standing(team_id="t001", team_name="一队", rank=1, solved=5, player_ids=["p001"]),
+            Standing(team_id="t002", team_name="二队", rank=2, solved=4, player_ids=["p002"]),
+        ],
     )
     _save_contest(
         contest_id="c_b",
         date_=date(2026, 4, 20),
-        weight=100,
-        total_teams=10,
-        standings=[Standing(team_id="t001", team_name="一队", rank=3, solved=5, player_ids=["p001"])],
+        standings=[
+            Standing(team_id="t001", team_name="一队", rank=2, solved=5, player_ids=["p001"]),
+            Standing(team_id="t002", team_name="二队", rank=1, solved=6, player_ids=["p002"]),
+        ],
     )
 
     # 整个春学期：两场都算，delta_recent = 最近一场（c_b）的得分
@@ -156,29 +155,42 @@ def test_board_period_filter_and_delta_recent(db_session):
     snap = BoardService(db_session).build(mode="all", period=spring)
     row = snap.rows[0]
     assert row.event_count == 2
-    assert row.rating == pytest.approx(1250.0 + 1050.0)
-    assert row.delta_recent == pytest.approx(1050.0)
+    # c_a rank1 → 950；c_b rank2 → 550
+    assert row.rating == pytest.approx(950.0 + 550.0)
+    assert row.delta_recent == pytest.approx(550.0)
 
     # 只含 3 月：只有 c_a，delta_recent = c_a 得分
     march = PeriodFilter(type="season", id="2026-春学期", start=date(2026, 3, 1), end=date(2026, 3, 31))
     snap_march = BoardService(db_session).build(mode="all", period=march)
     row_march = snap_march.rows[0]
     assert row_march.event_count == 1
-    assert row_march.rating == pytest.approx(1250.0)
-    assert row_march.delta_recent == pytest.approx(1250.0)
+    assert row_march.rating == pytest.approx(950.0)
+    assert row_march.delta_recent == pytest.approx(950.0)
 
 
 def test_board_competition_year_label_and_filter(db_session):
-    _save_players(db_session, _player("p001", name="张三"), _player("p002", name="李四"))
+    _save_players(
+        db_session,
+        _player("p001", name="张三"),
+        _player("p002", name="李四"),
+        _player("p003", name="王五"),
+        _player("p004", name="赵六"),
+    )
     _save_contest(
         contest_id="c_in",
         date_=date(2026, 5, 18),  # 属 2025 赛年（2025-09-01 ~ 2026-08-31）
-        standings=[Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"])],
+        standings=[
+            Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"]),
+            Standing(team_id="t002", team_name="二队", rank=2, player_ids=["p002"]),
+        ],
     )
     _save_contest(
         contest_id="c_out",
         date_=date(2026, 9, 5),  # 属 2026 赛年，2025 赛年窗口外
-        standings=[Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p002"])],
+        standings=[
+            Standing(team_id="t003", team_name="三队", rank=1, player_ids=["p003"]),
+            Standing(team_id="t004", team_name="四队", rank=2, player_ids=["p004"]),
+        ],
     )
 
     cy = PeriodFilter(type="competition_year", id=2025, start=date(2025, 9, 1), end=date(2026, 8, 31))
@@ -187,15 +199,18 @@ def test_board_competition_year_label_and_filter(db_session):
     assert snap.meta.period_type == "competition_year"
     assert snap.meta.period_id == 2025
     assert snap.meta.period_label == "2025赛年"
-    assert [r.player_id for r in snap.rows] == ["p001"]  # c_out 被窗口排除
+    assert [r.player_id for r in snap.rows] == ["p001", "p002"]  # c_out 被窗口排除
 
 
 def test_board_api_with_injected_session_does_not_cache(db_session):
-    _save_players(db_session, _player("p001", name="张三"))
+    _save_players(db_session, _player("p001", name="张三"), _player("p002", name="李四"))
     _save_contest(
         contest_id="c1",
         date_=date(2026, 5, 18),
-        standings=[Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"])],
+        standings=[
+            Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"]),
+            Standing(team_id="t002", team_name="二队", rank=2, player_ids=["p002"]),
+        ],
     )
 
     snap1 = board_api.board(mode="all", session=db_session)
@@ -217,11 +232,14 @@ def test_board_api_cache_hit_and_invalidation(monkeypatch):
     monkeypatch.setattr(board_api, "_get_default_factory", lambda: factory)
 
     with factory() as session:
-        _save_players(session, _player("p001", name="张三"))
+        _save_players(session, _player("p001", name="张三"), _player("p002", name="李四"))
         _save_contest(
             contest_id="c1",
             date_=date(2026, 5, 18),
-            standings=[Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"])],
+            standings=[
+                Standing(team_id="t001", team_name="一队", rank=1, player_ids=["p001"]),
+                Standing(team_id="t002", team_name="二队", rank=2, player_ids=["p002"]),
+            ],
         )
 
     snap1 = board_api.board(mode="all")

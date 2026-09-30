@@ -1,16 +1,21 @@
 # 会话上下文
 
-> 最近更新：2026-09-26 · 本文记录「最近一次盘点对话」的结论，供下次打开快速恢复；进度本体见 [PROGRESS.md](PROGRESS.md)，计划与剩余工作见 [docs/08-路线图.md](docs/08-路线图.md)。
+> 最近更新：2026-10-01 · 本文记录「最近一次盘点对话」的结论，供下次打开快速恢复；进度本体见 [PROGRESS.md](PROGRESS.md)，计划与剩余工作见 [docs/08-路线图.md](docs/08-路线图.md)。
 
-## 项目当前状态（2026-09-28）
+## 项目当前状态（2026-10-01）
 
-- **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期（业务补齐）进行中：**公式定案 + P-R1 已落地**，训练赛录入未开始
-- **Web P0–P5 全部完成**：榜单 `/`、认证、`/profile`、管理后台 P4a–P4d、`/about`、`/players/{id}`、`/contests/{id}`、URL query 同步、赛年/赛季筛选
-- **四期业务定案完成（2026-09-28 拍板）**：训练赛 Rating = **AtCoder 式表现分体系**（规格 docs/04 §2.1）——同队三人同分、负分照实显示、仅训练赛生效；**P-R1 重放引擎已落地**（core 159 + web 94 全绿）
-- **生涯积分制 v1 已实现（2026-09-30）**：UCup 式单场分（去 GP30、≥1 题门槛、maxSolved/n_teams 管理员配置）+「场次配置 → 认证 → 审核记分」工作流 + 双账本（队伍积分 0.6 / 成员队外个人积分求和 0.4 复合分，三人共享按队认证）；core `points` 模块 + 三表（迁移 `0002_points`）+ `/points` 与 `/admin/points` 页面；core 179 + web 106 全绿
-- 旁路二项已清（alembic + DTO 前置校验，均已提交）；formal/OJ 仍为 placeholder_v0
+- **里程碑：一期 ✅ 二期 ✅ 三期 ✅**；四期进行中：公式定案 + P-R1 + 积分制 v1 已落地
+- **Web P0–P5 全部完成**；新布局（顶栏大类 + 恒显侧边栏）已上线
+- **比赛统一化改造 P-U1 已落地（2026-10-01，按 CONTEST_UNIFICATION_PLAN.md）**：
+  - 新表 `tier`（赛事等级=系数，config 种子 + 兜底「未分级」）与 `awardlevel`（奖项基线 金100/银60/铜30/优胜20），迁移 `0003_unify_contest`；真库已升级并验证存量映射（省赛→ICPC 省赛 0.7 计排名不计积分，测试积分场→`points_{id}` 计积分可申报）
+  - `contest` 表改造：`format: icpc|ioi` × `entity: player|team` × `tier_id` + `max_value`/`scoring: formula|award_only`/`counts_for_points`/`counts_for_ranking`/`allow_claims`；旧列 source_type/contest_type/division/weight/rated **已删除**
+  - `pointsevent` 已删表并入 contest；`pointsclaim`/`pointsentry` 改挂 `contest_id`，claim 支持 award 申报（value/rank 可空）
+  - 新 `xcpc_core/tier/` 模块（六件套）；Web 新页 `/admin/tiers`（等级+奖项同页管理）、`/admin/contests` 统一创建表单、`/admin/points` 只留审批、`/points` 表单按 scoring 切换
+  - core 195 + web 106 全绿；浏览器验收通过（临时管理员 pu1_verify 已删）
+- 两轨制修订（D1）：「仅训练赛生效」→ 逐场 `counts_for_ranking`；榜单「仅正式赛」mode 已删除（`BoardMode = Literal["all"]`），formal_only URL 参数被忽略
+- formal/OJ 仍为 placeholder_v0；P-U2（计分接线）与 P-U3（通用 JSON 导入）未开始
 
-## 最近几次会话做了什么（2026-09-26 → 09-28）
+## 最近几次会话做了什么（2026-09-26 → 10-01）
 
 1. **alembic 引入（旁路项一，已提交 `bbea601`）**：`db/migrations/`（基线 `0001_baseline`）+ `run_migrations` 自愈式接线 + 4 条守护测试（漂移检测关键）；真库已 stamp。**改 tables.py 必须配迁移，漏写被 `test_models_match_migrations_no_drift` 拦下**。
 2. **formal 导入 DTO 前置校验（旁路项二，已提交 `94d0c7a`）**：解析结果四不变量进 model_validator；`contest_id` 防路径穿越（原直接拼 raw 文件名的窟窿）；contest_type 权重表查证前置到打开文件前、报错列出合法类型；16 条测试。
@@ -24,6 +29,12 @@
    - 复合分：队伍榜 = 0.6×团队积分 + 0.4×Σ(成员个人积分 − team_context=本队)，求和口径；个人榜直加，left 不出榜。
    - Web：`/admin/points`（创建场次 + 待审认证通过/驳回）、`/points`（提交认证 + 我的认证 + 双榜），审计筛选动作已加 points.*。
    - 待办：**浏览器手工验收**（项目惯例的里程碑关闭动作）；P4 正式赛免认证直录、P5 防刷上限（最好 N 场）未实现，见 §9.5。
+
+5. **前端美化 + 比赛统一化 P-U1（09-30 → 10-01）**：
+   - 布局定案并上线（顶栏四大类 + 侧边栏小项，`page_shell(section=, subsection=)` 字面量高亮）；主题在 rxconfig.py 的 RadixThemesPlugin。
+   - P-U1 按评审稿全量落地（详见顶部「项目当前状态」）；关键决策：D1 重排名口径（原始名次保留给积分百分位，内部重排名 1,2,3…并列取平均喂 Perf 方程，`<2` 实体场次跳过）、D6 存量映射（省赛保留，测试积分场并入）。
+   - 迁移 `0003` 是**手写重建式**：运行时连接 `PRAGMA foreign_keys=ON` 且事务内 pragma 是 no-op，rename/drop 父表会被隐式 DELETE 卡住 → 先把五张表数据读进内存、按「子表→父表」drop、再建新表回插。downgrade 只还原结构不回搬数据。
+   - board「仅正式赛」模式随 source_type 删除而移除；`RatingEvent.source_type="contest"`，占位计算器按 `(format, entity)` 路由，payload 用 `internal_rank`/`n_recorded`（重排名口径）。
 
 更早（2026-09-10 → 09-15）：三期关闭、GAP 评估并入路线图、榜单 URL query 同步、data_version 写路径自动 bump、`/about`、P5 详情页（players/contests + recharts）、docs 九篇重构、赛年/赛季筛选真实生效、测试盲区补齐、推送 `90b0cef..aa412c0`。
 
@@ -45,23 +56,25 @@
 
 ### 测试红线
 - **测试里禁止 `import xcpc_web.xcpc_web`（app 模块）**：顶层 `rx.App()` 会破坏 conftest 手搭的 State 链，引发 49 个跨测试 DB 复用失败。
-- conftest 用 `configure_session(session)` / `configure_store(store)` DI 注入内存 SQLite（player/team/contest/audit/importer/rating/board/points 全部已接）；真实 DB 零改动。
+- conftest 用 `configure_session(session)` / `configure_store(store)` DI 注入内存 SQLite（player/team/contest/audit/importer/rating/board/points/tier 全部已接）；真实 DB 零改动。contest service 的 tier 兜底解析走**同会话** TierStore，不跨库。
 - 测试命令：core `uv run python -m pytest xcpc_core -v`（根目录）；web `cd xcpc_web && ../.venv/bin/python -m pytest tests -v`。根 pyproject testpaths 只含 xcpc_core。
 
 ### 数据层约定
 - board 缓存 key `(mode, period_key, data_version)`；写路径 bump（`db/meta.bump_data_version`）后缓存自动换 key。
-- schema 唯一入口 `db.migrations.run_migrations`；`db/migrate.py` = schema 升级 + raw 灌数据（幂等）。
+- schema 唯一入口 `db.migrations.run_migrations`；`db/migrate.py` = schema 升级 + raw 灌数据（幂等）；raw→DTO 映射复用 `importer.formal._contest_create_from_document`（统一比赛模型 + tier 解析）。
+- **运行时 SQLite 连接 `PRAGMA foreign_keys=ON`**（session.py 逐连接挂载）→ 迁移中 rename/drop 被子表引用的父表会被卡；重建式迁移先 stash 数据再按子→父顺序 drop（0003 即此模式）。
+- 正式赛导入的 tier 解析：`tier_api.ensure_tier_for_contest_type(contest_type)`，config YAML 的 label/weight 为权威（缺失自动建），等级表可被管理端改名但导入会按 config 重建。
 - `RatingEvent` 无 contest_id 字段，从 `event_id.split("#",1)[0]` 取前缀（与 delete_contest 约定一致）。
 - openpyxl xcpcio 格式：A1 标题、第 2 行表头、第 3 行起数据；需 A–H 连续题列；只有获奖本校队进 standings。
 - web 导入测试需要把 `contest_weights.yaml` **和** `school.yaml` 都拷进临时仓库。
 
-## 下一步（docs/08-路线图 §3 第四步，按建议顺序）
+## 下一步
 
-1. **训练赛录入（四期第 2 项）**：导入入口 + `load_training_weight` + events training 分支 + raw/training 归档（见 docs/03 §3.4）；这是 P-R2 接线的前置——没有训练赛事件，重放引擎无数据可算。
-2. **P-R2 接线**：board 训练赛榜走 `AtcoderReplayEngine`（生涯/赛年/赛季三档）+ 选手详情页曲线换 rating_after 语义 + `meta.rating_algorithm` 升版。
-3. **P-R4 试算页 `/admin/rating`**：两轨参数试算（不落库）。
-4. **积分制收尾**：浏览器手工验收（/points 与 /admin/points）；P4 正式赛免认证直录、P5 防刷上限按需启用（RATING_FORMULA_PLAN §9.5）。
-5. 挂起的开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项，其余不阻塞。
+1. **P-U2 计分接线（CONTEST_UNIFICATION_PLAN §7）**：compute_points 统一（formula/award_only × 系数，core 侧已就位）→ 导入/认证 → 流水全链路核对；`counts_for_ranking` 事件流已过滤，**board 训练/生涯榜切 `AtcoderReplayEngine`**（tier.coefficient 进 0.9^i 时间加权）+ 选手页曲线换 rating_after + `meta.rating_algorithm` 升版；详情页标签已做，可复查。
+2. **P-U3 通用 JSON 导入**：任意比赛数据导入（姓名匹配/自动建队复用 formal 逻辑），原「训练赛录入」方案并入此通道。
+3. 积分制遗留：P4 正式赛免认证直录、P5 防刷上限（RATING_FORMULA_PLAN §9.5）。
+4. CONTEST_UNIFICATION_PLAN.md 定稿后并入 docs/03、04 并删除本稿（稿首注明）。
+5. 挂起开放决策见 docs/08 §4：OJ 立项（#3）、注册限制（#4）为五期前阻塞项。
 
 ## 关键技术结论（下次开发直接复用，避免重踩）
 

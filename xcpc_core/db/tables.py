@@ -85,23 +85,53 @@ class TeamAlias(Base):
     alias: Mapped[str] = mapped_column(String)  # 队名历史
 
 
+class Tier(Base):
+    """赛事等级（管理员前端 CRUD）：决定积分系数与排名权重（CONTEST_UNIFICATION_PLAN §2.1）。"""
+
+    __tablename__ = "tier"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, unique=True)  # 如「ICPC 省赛」
+    coefficient: Mapped[float] = mapped_column(Float, default=1.0)  # 积分/排名系数
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AwardLevel(Base):
+    """奖项基线分（与 tier 同页管理）：奖项分 = base_points × tier.coefficient（§2.2）。"""
+
+    __tablename__ = "awardlevel"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, unique=True)  # gold|silver|bronze|honorable…
+    base_points: Mapped[float] = mapped_column(Float, default=0.0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class Contest(Base):
+    """统一比赛（CONTEST_UNIFICATION_PLAN §2.3）：赛制 icpc|ioi × 形式 player|team × 等级 tier。
+
+    逐场双开关 counts_for_points / counts_for_ranking 决定进积分流水 / Rating 重放；
+    scoring=award_only 的场次（未公开完整排名）强制不进排名，积分由奖项基线 × 系数决定。
+    原 source_type/contest_type/division/weight/rated 语义由 tier 与双开关承载，已删除。
+    """
+
     __tablename__ = "contest"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    source_type: Mapped[str] = mapped_column(String, index=True)  # formal|training
     title: Mapped[str] = mapped_column(String)
     date: Mapped[date] = mapped_column(Date, index=True)
     competition_year: Mapped[int] = mapped_column(Integer, index=True)
     season: Mapped[str] = mapped_column(String, index=True)
-    contest_type: Mapped[str | None] = mapped_column(String)  # formal 用，决定权重
-    format: Mapped[str] = mapped_column(String)  # team_xcpc|solo_xcpc|oi
-    division: Mapped[str | None] = mapped_column(String)  # training 用，决定权重
-    total_teams: Mapped[int | None] = mapped_column(Integer)  # formal 必填
+    format: Mapped[str] = mapped_column(String)  # icpc|ioi（赛制）
+    entity: Mapped[str] = mapped_column(String)  # player|team（参与形式）
+    tier_id: Mapped[int | None] = mapped_column(ForeignKey("tier.id"), index=True)
+    n_teams: Mapped[int | None] = mapped_column(Integer)  # 参赛实体数（队数/人数）
     school_teams_count: Mapped[int | None] = mapped_column(Integer)
-    rated: Mapped[bool] = mapped_column(Boolean, default=True)
-    weight: Mapped[int] = mapped_column(Integer)  # 基准 100
-    weight_source: Mapped[str] = mapped_column(String)  # config|override
+    max_value: Mapped[int | None] = mapped_column(Integer)  # 全场最高解题数/得分
+    scoring: Mapped[str] = mapped_column(String, default="formula")  # formula|award_only
+    counts_for_points: Mapped[bool] = mapped_column(Boolean, default=False)
+    counts_for_ranking: Mapped[bool] = mapped_column(Boolean, default=True)
+    allow_claims: Mapped[bool] = mapped_column(Boolean, default=True)
     source_file: Mapped[str | None] = mapped_column(String)  # 追溯到 raw/
 
 
@@ -110,14 +140,14 @@ class Standing(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     contest_id: Mapped[str] = mapped_column(ForeignKey("contest.id"), index=True)
-    team_id: Mapped[str | None] = mapped_column(String)  # solo 场次为空
+    team_id: Mapped[str | None] = mapped_column(String)  # 个人场次为空
     team_name: Mapped[str | None] = mapped_column(String)
-    rank: Mapped[int] = mapped_column(Integer)
+    rank: Mapped[int | None] = mapped_column(Integer)  # award_only 行可无名次
     school_rank: Mapped[int | None] = mapped_column(Integer)
-    award: Mapped[str | None] = mapped_column(String)  # gold|silver|bronze|null
-    solved: Mapped[int | None] = mapped_column(Integer)  # xcpc
-    penalty: Mapped[int | None] = mapped_column(Integer)  # xcpc
-    score: Mapped[int | None] = mapped_column(Integer)  # oi
+    award: Mapped[str | None] = mapped_column(String)  # gold|silver|bronze|…
+    solved: Mapped[int | None] = mapped_column(Integer)  # icpc
+    penalty: Mapped[int | None] = mapped_column(Integer)  # icpc
+    score: Mapped[int | None] = mapped_column(Integer)  # ioi
     manually_added: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -224,30 +254,12 @@ class ImportBatch(Base):
     created_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
-class PointsEvent(Base):
-    """积分场次配置（UCup 式单场分，RATING_FORMULA_PLAN.md §9）。
-
-    max_value / n_teams 为管理员配置的公式参数；审核通过时随流水快照，
-    事后改配置不溯及已记积分。
-    """
-
-    __tablename__ = "pointsevent"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    title: Mapped[str] = mapped_column(String)
-    date: Mapped[date] = mapped_column(Date, index=True)
-    entity: Mapped[str] = mapped_column(String)  # player|team（认证主体）
-    kind: Mapped[str] = mapped_column(String)  # solved|score（value 语义：解题数/得分）
-    max_value: Mapped[int] = mapped_column(Integer)  # 全场最高解题数/得分
-    n_teams: Mapped[int] = mapped_column(Integer)  # 参赛实体数（队数/人数）
-    created_by: Mapped[int] = mapped_column(Integer)  # localuser.id
-    created_at: Mapped[datetime | None] = mapped_column(DateTime)
-
-
 class PointsClaim(Base):
     """积分认证：staged → approved/rejected（与 ImportBatch/BindingRequest 同型）。
 
-    唯一性（部分唯一索引，见迁移）：个人赛 (event, player)、队伍赛 (event, team)
+    认证改挂统一 contest（CONTEST_UNIFICATION_PLAN §2.5）：formula 场次填 value/rank，
+    award_only 场次填 award（须在 awardlevel 内），value/rank 置空。
+    唯一性（部分唯一索引，见迁移）：个人赛 (contest, player)、队伍赛 (contest, team)
     各只允许一条非 rejected 记录，service 层同时前置校验。
     """
 
@@ -255,14 +267,14 @@ class PointsClaim(Base):
     __table_args__ = (
         Index(
             "uq_pointsclaim_event_player",
-            "event_id",
+            "contest_id",
             "player_id",
             unique=True,
             sqlite_where=sa_text("player_id IS NOT NULL AND status != 'rejected'"),
         ),
         Index(
             "uq_pointsclaim_event_team",
-            "event_id",
+            "contest_id",
             "team_id",
             unique=True,
             sqlite_where=sa_text("team_id IS NOT NULL AND status != 'rejected'"),
@@ -270,12 +282,13 @@ class PointsClaim(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("pointsevent.id"), index=True)
-    entity: Mapped[str] = mapped_column(String)  # player|team（冗余自 event，便于查询）
+    contest_id: Mapped[str] = mapped_column(ForeignKey("contest.id"), index=True)
+    entity: Mapped[str] = mapped_column(String)  # player|team（冗余自 contest，便于查询）
     player_id: Mapped[str | None] = mapped_column(ForeignKey("player.id"), index=True)
     team_id: Mapped[str | None] = mapped_column(ForeignKey("team.id"), index=True)
-    value: Mapped[int] = mapped_column(Integer)  # 解题数/得分，资格线 ≥ 1
-    rank: Mapped[int] = mapped_column(Integer)
+    value: Mapped[int | None] = mapped_column(Integer)  # 解题数/得分，formula 场次 ≥ 1
+    rank: Mapped[int | None] = mapped_column(Integer)  # formula 场次必填
+    award: Mapped[str | None] = mapped_column(String)  # award_only 场次必填
     note: Mapped[str | None] = mapped_column(String)
     status: Mapped[str] = mapped_column(String)  # staged|approved|rejected
     submitted_by: Mapped[int] = mapped_column(Integer)  # localuser.id
@@ -290,7 +303,7 @@ class PointsEntry(Base):
     队伍赛通过 → 1 条 team 流水 + 每名现役成员 1 条 player 流水
     （team_context=该队）；个人赛通过 → 1 条 player 流水（team_context 空）。
     队伍复合分的排除规则 = 成员流水按 team_context != 本队 过滤。
-    payload_json 为公式输入快照（value/rank/max_value/n_teams），改配置不溯及。
+    payload_json 为公式输入快照（value/rank/max_value/n_teams/系数），改配置不溯及。
     """
 
     __tablename__ = "pointsentry"
@@ -299,7 +312,7 @@ class PointsEntry(Base):
     owner_type: Mapped[str] = mapped_column(String)  # player|team
     owner_id: Mapped[str] = mapped_column(String, index=True)
     points: Mapped[float] = mapped_column(Float)
-    event_id: Mapped[int] = mapped_column(ForeignKey("pointsevent.id"), index=True)
+    contest_id: Mapped[str] = mapped_column(ForeignKey("contest.id"), index=True)
     claim_id: Mapped[int | None] = mapped_column(ForeignKey("pointsclaim.id"))
     team_context: Mapped[str | None] = mapped_column(String)
     payload_json: Mapped[str] = mapped_column(Text)

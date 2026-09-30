@@ -63,10 +63,10 @@ def get_contest(contest_id: str, *, store: ContestStore | None = None) -> Contes
             session.close()
 
 
-def list_contests(*, source_type: str | None = None, store: ContestStore | None = None) -> list[Contest]:
+def list_contests(*, tier_id: int | None = None, store: ContestStore | None = None) -> list[Contest]:
     service, session = _open_service(store=store)
     try:
-        return service.list_contests(source_type=source_type)
+        return service.list_contests(tier_id=tier_id)
     finally:
         if session is not None:
             session.close()

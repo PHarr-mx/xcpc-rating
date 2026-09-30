@@ -58,12 +58,12 @@ def test_on_load_default_without_query(core_store):
 
 
 def test_on_load_restores_from_query(core_store):
-    """带参打开：筛选状态从 URL query 恢复。"""
+    """带参打开：筛选状态从 URL query 恢复；formal_only 随模式废弃被忽略。"""
     st = _make_board_state(
         {"mode": "formal_only", "period_type": "competition_year", "period_id": "2025", "search": "张"}
     )
     st.on_load()
-    assert st.mode == "formal_only"
+    assert st.mode == "all"  # formal_only 已废弃 → 忽略回落
     assert st.period_type == "competition_year"
     assert st.period_id == "2025"
     assert st.search == "张"
@@ -99,14 +99,13 @@ def test_setters_validate():
     assert st.sort_by == "rating_desc"
 
 
-def test_set_mode_sync_url_returns_redirect(core_store):
-    """set_mode_sync_url 改状态并返回带参 redirect。"""
+def test_set_mode_deprecated_values_ignored(core_store):
+    """mode 已收敛为单一口径：formal_only 等旧值被忽略。"""
     st = _make_board_state()
     with pytest.MonkeyPatch.context() as mp:
-        # board_snapshot 走真实 core API；内存库无数据即可，不关心 rows 内容
         spec = st.set_mode_sync_url("formal_only")
-    assert st.mode == "formal_only"
-    assert _redirect_path(spec) == "/?mode=formal_only"
+    assert st.mode == "all"
+    assert _redirect_path(spec) == "/"  # 默认组合 → URL 干净
 
 
 def test_set_period_sync_url_returns_redirect(core_store):
@@ -127,9 +126,9 @@ def test_set_search_sync_url_encodes_and_trims_default(core_store):
     assert _redirect_path(spec) == "/?search=Zhang%20San"
 
     # 切回默认组合 → URL 回到 /
-    st2 = _make_board_state({"mode": "formal_only"})
+    st2 = _make_board_state({"search": "x"})
     with pytest.MonkeyPatch.context() as mp:
-        spec2 = st2.set_mode_sync_url("all")
+        spec2 = st2.set_search_sync_url("")
     assert _redirect_path(spec2) == "/"
 
 
@@ -176,17 +175,17 @@ def test_set_period_option_unknown_label_ignored(core_store):
 
 
 def test_board_url_roundtrip(core_store):
-    """_board_url 产出 → on_load 恢复 → 再产出，URL 幂等。"""
+    """_board_url 产出 → on_load 恢复 → 再产出，URL 幂等（period 参数）。"""
     st = _make_board_state()
     with pytest.MonkeyPatch.context() as mp:
-        spec = st.set_mode_sync_url("formal_only")
+        spec = st.set_period_sync_url("competition_year", "2025")
     url = _redirect_path(spec)
 
     st2 = _make_board_state(
         dict(p.split("=", 1) for p in url[2:].split("&"))
     )
     st2.on_load()
-    assert st2.mode == "formal_only"
+    assert (st2.period_type, st2.period_id) == ("competition_year", "2025")
     with pytest.MonkeyPatch.context() as mp:
         spec2 = st2._sync_url()
     assert _redirect_path(spec2) == url

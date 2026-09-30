@@ -72,7 +72,7 @@ def test_migrate_seeds_from_repo_root(repo):
             player = session.get(tables.Player, "p001")
             assert player.name == "张三" and player.grade == 2023
             contest = session.get(tables.Contest, "c1")
-            assert contest.total_teams == 10
+            assert contest.n_teams == 10
             assert contest.competition_year == 2025 and contest.season == "2026-春学期"
     finally:
         engine.dispose()

@@ -94,6 +94,63 @@ class TrainingDispatcher(BaseRatingCalculator):
         return calc.compute_base_score(event)
 
 
+class ContestTeamCalculator(BaseRatingCalculator):
+    """统一比赛·团队形式（placeholder_v0）：按重排名百分位，基础分按队员数均分。"""
+
+    source_type = "contest"
+
+    def compute_base_score(self, event: RatingEvent) -> float:
+        rank = event.payload["internal_rank"]
+        n_recorded = event.payload["n_recorded"]
+        solved = event.payload.get("solved", 0)
+        size = max(event.payload.get("size", 1), 1)
+        return max(0, (n_recorded - rank + 1) / n_recorded * 800 + solved * 30) / size
+
+
+class ContestSoloCalculator(BaseRatingCalculator):
+    """统一比赛·个人形式（placeholder_v0）。"""
+
+    source_type = "contest"
+
+    def compute_base_score(self, event: RatingEvent) -> float:
+        rank = event.payload["internal_rank"]
+        n_recorded = event.payload["n_recorded"]
+        solved = event.payload.get("solved", 0)
+        return max(0, (n_recorded - rank + 1) / n_recorded * 800 + solved * 30)
+
+
+class ContestOiCalculator(BaseRatingCalculator):
+    """统一比赛·IOI 赛制（placeholder_v0）：按得分。"""
+
+    source_type = "contest"
+
+    def compute_base_score(self, event: RatingEvent) -> float:
+        rank = event.payload["internal_rank"]
+        n_recorded = event.payload["n_recorded"]
+        score = event.payload.get("score", 0)
+        return max(0, (n_recorded - rank + 1) / n_recorded * 800 + score * 2)
+
+
+class ContestDispatcher(BaseRatingCalculator):
+    """统一比赛按赛制×参与形式路由到具体计算器。"""
+
+    source_type = "contest"
+
+    def __init__(self) -> None:
+        self._by_shape: dict[tuple[str, str], BaseRatingCalculator] = {
+            ("icpc", "team"): ContestTeamCalculator(),
+            ("icpc", "player"): ContestSoloCalculator(),
+            ("ioi", "player"): ContestOiCalculator(),
+        }
+
+    def compute_base_score(self, event: RatingEvent) -> float:
+        shape = (event.contest_format or "", event.payload.get("entity", "player"))
+        calc = self._by_shape.get(shape)
+        if calc is None:
+            raise ValueError(f"未知比赛形态: {shape}")
+        return calc.compute_base_score(event)
+
+
 class OjContestCalculator(BaseRatingCalculator):
     """OJ 比赛：由 rating delta 计算。"""
 

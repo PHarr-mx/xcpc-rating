@@ -9,6 +9,7 @@ from xcpc_web.pages.admin.overview import admin_overview
 from xcpc_web.pages.admin.players import admin_players
 from xcpc_web.pages.admin.points import admin_points
 from xcpc_web.pages.admin.teams import admin_teams
+from xcpc_web.pages.admin.tiers import admin_tiers
 from xcpc_web.pages.admin.users import admin_users
 from xcpc_web.pages.contest_detail import contest_detail
 from xcpc_web.pages.index import index
@@ -24,6 +25,7 @@ from xcpc_web.states.admin.overview import AdminOverviewState
 from xcpc_web.states.admin.players import AdminPlayersState
 from xcpc_web.states.admin.points import AdminPointsState
 from xcpc_web.states.admin.teams import AdminTeamsState
+from xcpc_web.states.admin.tiers import AdminTiersState
 from xcpc_web.states.admin.users import AdminUsersState
 from xcpc_web.states.board import BoardState
 from xcpc_web.states.contest_detail import ContestDetailState
@@ -99,6 +101,13 @@ app.add_page(
 app.add_page(
     reflex_local_auth.require_login(admin_points),
     route="/admin/points",
-    title="积分管理",
+    title="积分认证",
     on_load=AdminPointsState.on_load,
+)
+
+app.add_page(
+    reflex_local_auth.require_login(admin_tiers),
+    route="/admin/tiers",
+    title="赛事等级",
+    on_load=AdminTiersState.on_load,
 )

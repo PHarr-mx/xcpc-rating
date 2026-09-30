@@ -28,17 +28,18 @@ class ContestStore:
         row = self.session.get(ContestRow, contest_id)
         return self._to_dto(row) if row is not None else None
 
-    def list_all(self, *, source_type: str | None = None) -> list[Contest]:
+    def list_all(self, *, tier_id: int | None = None) -> list[Contest]:
         stmt = select(ContestRow).order_by(ContestRow.date.desc(), ContestRow.id)
-        if source_type is not None:
-            stmt = stmt.where(ContestRow.source_type == source_type)
+        if tier_id is not None:
+            stmt = stmt.where(ContestRow.tier_id == tier_id)
         return [self._to_dto(row) for row in self.session.scalars(stmt)]
 
     def list_standings(self, contest_id: str) -> list[Standing]:
         rows = self.session.scalars(
             select(StandingRow)
             .where(StandingRow.contest_id == contest_id)
-            .order_by(StandingRow.rank, StandingRow.id)
+            # award_only 行可无名次：rank 为空的排后面，有名次的按名次升序
+            .order_by(StandingRow.rank.is_not(None), StandingRow.rank, StandingRow.id)
         ).all()
         return [self._to_standing_dto(row) for row in rows]
 
@@ -54,19 +55,20 @@ class ContestStore:
         row = self.session.get(ContestRow, contest.id)
         if row is None:
             raise ContestNotFoundError(contest.id)
-        row.source_type = contest.source_type
         row.title = contest.title
         row.date = contest.date
         row.competition_year = contest.competition_year
         row.season = contest.season
-        row.contest_type = contest.contest_type
         row.format = contest.format
-        row.division = contest.division
-        row.total_teams = contest.total_teams
+        row.entity = contest.entity
+        row.tier_id = contest.tier_id
+        row.n_teams = contest.n_teams
         row.school_teams_count = contest.school_teams_count
-        row.rated = contest.rated
-        row.weight = contest.weight
-        row.weight_source = contest.weight_source
+        row.max_value = contest.max_value
+        row.scoring = contest.scoring
+        row.counts_for_points = contest.counts_for_points
+        row.counts_for_ranking = contest.counts_for_ranking
+        row.allow_claims = contest.allow_claims
         row.source_file = contest.source_file
         self._clear_standings(contest.id)
         self._write_standings(contest.id, standings)
@@ -92,19 +94,20 @@ class ContestStore:
     def _to_dto(self, row: ContestRow) -> Contest:
         return Contest(
             id=row.id,
-            source_type=row.source_type,
             title=row.title,
             date=row.date,
             competition_year=row.competition_year,
             season=row.season,
-            contest_type=row.contest_type,
             format=row.format,
-            division=row.division,
-            total_teams=row.total_teams,
+            entity=row.entity,
+            tier_id=row.tier_id,
+            n_teams=row.n_teams,
             school_teams_count=row.school_teams_count,
-            rated=row.rated,
-            weight=row.weight,
-            weight_source=row.weight_source,
+            max_value=row.max_value,
+            scoring=row.scoring,
+            counts_for_points=row.counts_for_points,
+            counts_for_ranking=row.counts_for_ranking,
+            allow_claims=row.allow_claims,
             source_file=row.source_file,
         )
 
@@ -130,19 +133,20 @@ class ContestStore:
     def _to_row(self, contest: Contest) -> ContestRow:
         return ContestRow(
             id=contest.id,
-            source_type=contest.source_type,
             title=contest.title,
             date=contest.date,
             competition_year=contest.competition_year,
             season=contest.season,
-            contest_type=contest.contest_type,
             format=contest.format,
-            division=contest.division,
-            total_teams=contest.total_teams,
+            entity=contest.entity,
+            tier_id=contest.tier_id,
+            n_teams=contest.n_teams,
             school_teams_count=contest.school_teams_count,
-            rated=contest.rated,
-            weight=contest.weight,
-            weight_source=contest.weight_source,
+            max_value=contest.max_value,
+            scoring=contest.scoring,
+            counts_for_points=contest.counts_for_points,
+            counts_for_ranking=contest.counts_for_ranking,
+            allow_claims=contest.allow_claims,
             source_file=contest.source_file,
         )
 

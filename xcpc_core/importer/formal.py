@@ -29,6 +29,7 @@ from xcpc_core.importer.players import resolve_default_grade, resolve_member_nam
 from xcpc_core.contest.api import save_contest
 from xcpc_core.contest.models import ContestCreate, Standing
 from xcpc_core.contest.store import ContestStore
+from xcpc_core.tier.api import ensure_tier_for_contest_type
 from xcpc_core.importer.weights import load_formal_weight
 from xcpc_core.importer.xcpcio_xlsx import parse_xcpcio_xlsx
 from xcpc_core.player.store import PlayerStore, find_repo_root
@@ -57,13 +58,19 @@ def _team_store(session: Session) -> TeamStore:
     return TeamStore(session)
 
 
-def _contest_create_from_document(document: dict[str, Any], *, source_file: str) -> ContestCreate:
-    """把 raw 正式赛文档映射为 ContestCreate，用于写入 SQLite。"""
+def _contest_create_from_document(
+    document: dict[str, Any], *, source_file: str, session: Session
+) -> ContestCreate:
+    """把 raw 正式赛文档映射为 ContestCreate，用于写入 SQLite（统一比赛模型）。
+
+    正式赛固定：赛制 icpc、团队形式、按完整名次进 Rating 重放（counts_for_ranking
+    沿用归档 rated）、不记积分、不接受申报；tier 由 contest_type 对照 config 解析。
+    """
     standings = [
         Standing(
             team_id=row.get("team_id"),
             team_name=row.get("team_name"),
-            rank=row["rank"],
+            rank=row.get("rank"),
             school_rank=row.get("school_rank"),
             award=row.get("award"),
             solved=row.get("solved"),
@@ -74,18 +81,25 @@ def _contest_create_from_document(document: dict[str, Any], *, source_file: str)
         )
         for row in document.get("standings") or []
     ]
+    max_value = max(
+        (value for row in standings for value in (row.solved, row.score) if value is not None),
+        default=None,
+    )
+    tier = ensure_tier_for_contest_type(document.get("contest_type", ""), session=session)
     return ContestCreate(
         id=document["contest_id"],
-        source_type="formal",
         title=document["title"],
         date=date.fromisoformat(document["date"]),
-        contest_type=document.get("contest_type"),
-        format=document.get("format", "team_xcpc"),
-        total_teams=document.get("total_teams"),
+        format="icpc" if document.get("format", "team_xcpc") != "oi" else "ioi",
+        entity="team",
+        tier_id=tier.id,
+        n_teams=document.get("total_teams"),
         school_teams_count=document.get("school_teams_count"),
-        rated=document.get("rated", True),
-        weight=document.get("weight", 100),
-        weight_source=document.get("weight_source", "config"),
+        max_value=max_value,
+        scoring="formula",
+        counts_for_points=False,
+        counts_for_ranking=document.get("rated", True),
+        allow_claims=False,
         source_file=source_file,
         standings=standings,
     )
@@ -349,7 +363,7 @@ def import_formal_xcpcio_xlsx(
     if write_raw:
         save_raw_contest(raw_path, document)
     # 写入 SQLite（raw 归档与 DB 并存，DB 为运行时数据源）
-    save_contest(_contest_create_from_document(document, source_file=raw_rel), store=ContestStore(session))
+    save_contest(_contest_create_from_document(document, source_file=raw_rel, session=session), store=ContestStore(session))
 
     result = FormalImportResult(
         contest_id=params.contest_id,
@@ -441,7 +455,7 @@ def add_formal_team(
 
     raw_rel = raw_contest_rel_path(params.contest_id)
     # 同步写入 SQLite
-    save_contest(_contest_create_from_document(document, source_file=raw_rel), store=ContestStore(session))
+    save_contest(_contest_create_from_document(document, source_file=raw_rel, session=session), store=ContestStore(session))
 
     if plog:
         plog.info(

@@ -1,16 +1,10 @@
 """points 模块异常。"""
 
+from xcpc_core.contest.exceptions import ContestNotFoundError  # re-export：认证场次=统一比赛
+
 
 class PointsError(Exception):
     """积分模块基础异常。"""
-
-
-class EventNotFoundError(PointsError):
-    """积分场次不存在。"""
-
-
-class InvalidEventError(PointsError):
-    """场次参数非法。"""
 
 
 class ClaimNotFoundError(PointsError):
@@ -22,7 +16,7 @@ class ClaimStateError(PointsError):
 
 
 class DuplicateClaimError(PointsError):
-    """同（队/人）同场次重复认证。"""
+    """同（队/人）同比赛重复认证。"""
 
 
 class NotTeamMemberError(PointsError):
@@ -30,4 +24,8 @@ class NotTeamMemberError(PointsError):
 
 
 class InvalidClaimError(PointsError):
-    """认证内容非法（资格线、名次范围、value 越界等）。"""
+    """认证内容非法（资格线、名次范围、奖项不存在、场次不允许申报等）。"""
+
+
+class UnknownAwardError(InvalidClaimError):
+    """申报的奖项不在 awardlevel 内。"""

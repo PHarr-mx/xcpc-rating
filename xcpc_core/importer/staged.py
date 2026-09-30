@@ -47,6 +47,7 @@ from xcpc_core.importer.models import (
 )
 from xcpc_core.importer.weights import load_formal_weight
 from xcpc_core.importer.xcpcio_xlsx import parse_xcpcio_xlsx
+from xcpc_core.tier.api import ensure_tier_for_contest_type
 from xcpc_core.player.models import PlayerCreate, PlayerStatus
 from xcpc_core.player.service import PlayerService
 from xcpc_core.player.store import PlayerStore, find_repo_root
@@ -396,18 +397,25 @@ def confirm_import_batch(
             unmatched_teams=[],
         )
         raw_rel = raw_contest_rel_path(params.contest_id)
+        max_value = max(
+            (value for s in standings for value in (s.solved, s.score) if value is not None),
+            default=None,
+        )
+        tier = ensure_tier_for_contest_type(params.contest_type, session=session)
         contest_data = ContestCreate(
             id=params.contest_id,
-            source_type="formal",
             title=payload.parsed.title,
             date=params.date,
-            contest_type=params.contest_type,
-            format=params.format,
-            total_teams=payload.parsed.total_teams,
+            format="icpc",
+            entity="team",
+            tier_id=tier.id,
+            n_teams=payload.parsed.total_teams,
             school_teams_count=payload.parsed.school_teams_total,
-            rated=True,
-            weight=int(payload.contest_meta["weight"]),
-            weight_source=str(payload.contest_meta["weight_source"]),
+            max_value=max_value,
+            scoring="formula",
+            counts_for_points=False,
+            counts_for_ranking=True,
+            allow_claims=False,
             source_file=raw_rel,
             standings=standings,
         )

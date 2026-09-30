@@ -17,7 +17,6 @@ from datetime import date, datetime
 from pathlib import Path
 
 from xcpc_core.contest.api import save_contest
-from xcpc_core.contest.models import ContestCreate, Standing
 from xcpc_core.contest.store import ContestStore
 from xcpc_core.db.migrations import run_migrations
 from xcpc_core.db.session import default_db_url, find_repo_root, make_session_factory
@@ -76,38 +75,15 @@ def migrate_formal_contests(session, *, plog: Plog, repo_root: Path) -> int:
     raw_dir = repo_root / "data/raw/formal"
     files = sorted(raw_dir.glob("*.json")) if raw_dir.is_dir() else []
     store = ContestStore(session)
+    # raw 文档 → 统一比赛 DTO 的映射与正式赛导入共用一套（含 tier 解析）
+    from xcpc_core.importer.formal import _contest_create_from_document
+
     count = 0
     for path in files:
         with path.open(encoding="utf-8") as file:
             doc = json.load(file)
-        contest = ContestCreate(
-            id=doc["contest_id"],
-            source_type="formal",
-            title=doc["title"],
-            date=date.fromisoformat(doc["date"]),
-            contest_type=doc.get("contest_type"),
-            format=doc.get("format", "team_xcpc"),
-            total_teams=doc.get("total_teams"),
-            school_teams_count=doc.get("school_teams_count"),
-            rated=doc.get("rated", True),
-            weight=doc.get("weight", 100),
-            weight_source=doc.get("weight_source", "config"),
-            source_file=f"raw/formal/{path.name}",
-            standings=[
-                Standing(
-                    team_id=row.get("team_id"),
-                    team_name=row.get("team_name"),
-                    rank=row["rank"],
-                    school_rank=row.get("school_rank"),
-                    award=row.get("award"),
-                    solved=row.get("solved"),
-                    penalty=row.get("penalty"),
-                    score=row.get("score"),
-                    manually_added=row.get("manually_added", False),
-                    player_ids=row.get("player_ids") or [],
-                )
-                for row in doc.get("standings") or []
-            ],
+        contest = _contest_create_from_document(
+            doc, source_file=f"raw/formal/{path.name}", session=session
         )
         save_contest(contest, store=store)
         count += 1

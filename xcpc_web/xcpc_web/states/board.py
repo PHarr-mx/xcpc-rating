@@ -8,8 +8,9 @@ import reflex as rx
 from xcpc_core.board import api as board_api
 from xcpc_core.rating.models import PeriodFilter
 
-# URL query 白名单（docs/14 P1 任务 6）：非法值一律忽略，回落默认
-_VALID_MODES = {"all", "formal_only"}
+# URL query 白名单（docs/14 P1 任务 6）：非法值一律忽略，回落默认。
+# mode 仅为兼容保留的单一口径；「仅正式赛」随比赛统一化废弃。
+_VALID_MODES = {"all"}
 _VALID_PERIOD_TYPES = {"career", "competition_year", "season"}
 _VALID_SORTS = {"rating_desc", "rating_asc", "name_asc", "name_desc"}
 

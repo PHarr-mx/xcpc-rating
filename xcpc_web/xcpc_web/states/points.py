@@ -2,6 +2,7 @@
 
 权限纪律与 ProfileState 一致：认证主体一律取 ``bound_player_id``（服务端推导），
 不接受客户端传入 player_id；队伍赛从本人现役队伍中选择（service 再校验成员身份）。
+表单按比赛的计分方式切换：formula 场次填解题数/名次，award_only 场次选奖项。
 """
 
 from __future__ import annotations
@@ -9,22 +10,25 @@ from __future__ import annotations
 import reflex as rx
 import reflex_local_auth
 
+import xcpc_core.contest.api as contest_api
 import xcpc_core.points.api as points_api
 from xcpc_core.points.models import PointsClaimCreate
 
 from xcpc_web.states.auth import AuthState
 
 STATUS_LABELS = {"staged": "待审核", "approved": "已通过", "rejected": "已驳回"}
+AWARD_LABELS = {"gold": "金奖", "silver": "银奖", "bronze": "铜奖", "honorable": "优胜奖"}
 
 
 class PointsState(AuthState):
     """``/points`` 状态。"""
 
     # 提交认证表单
-    claim_event_id: str = ""  # 下拉选项形如 "3. 场次名"
+    claim_contest: str = ""  # 下拉选项形如 "{contest_id}. {title}"
     claim_team_id: str = ""
     claim_value: str = ""
     claim_rank: str = ""
+    claim_award: str = ""
     claim_note: str = ""
     claim_error: str = ""
     claim_feedback: str = ""
@@ -39,8 +43,8 @@ class PointsState(AuthState):
 
     # ---- 表单 setter ----
 
-    def set_claim_event_id(self, value: str) -> None:
-        self.claim_event_id = value
+    def set_claim_contest(self, value: str) -> None:
+        self.claim_contest = value
 
     def set_claim_team_id(self, value: str) -> None:
         self.claim_team_id = value
@@ -51,43 +55,84 @@ class PointsState(AuthState):
     def set_claim_rank(self, value: str) -> None:
         self.claim_rank = value
 
+    def set_claim_award(self, value: str) -> None:
+        self.claim_award = value
+
     def set_claim_note(self, value: str) -> None:
         self.claim_note = value
 
     # ---- 展示 var ----
 
     @rx.var(cache=False)
-    def events(self) -> list[dict]:
+    def contests(self) -> list[dict]:
+        """可申报的比赛：允许申报且计入积分。"""
         if not self.is_authenticated:
+            return []
+        try:
+            all_contests = contest_api.list_contests()
+        except Exception:
             return []
         return [
             {
-                "id": e.id,
-                "title": e.title,
-                "date_label": e.date.isoformat(),
-                "entity": e.entity,
-                "max_value": e.max_value,
-                "n_teams": e.n_teams,
+                "id": c.id,
+                "title": c.title,
+                "date_label": c.date.isoformat(),
+                "entity": c.entity,
+                "scoring": c.scoring,
+                "max_value": c.max_value,
+                "n_teams": c.n_teams,
             }
-            for e in points_api.list_events()
+            for c in all_contests
+            if c.allow_claims and c.counts_for_points
         ]
 
     @rx.var(cache=False)
-    def event_options(self) -> list[str]:
-        return [f'{e["id"]}. {e["title"]}' for e in self.events]
+    def contest_options(self) -> list[str]:
+        return [f'{c["id"]}. {c["title"]}' for c in self.contests]
 
     @rx.var(cache=False)
-    def selected_event(self) -> dict | None:
-        prefix = self.claim_event_id.split(".", 1)[0].strip()
-        for event in self.events:
-            if str(event["id"]) == prefix:
-                return event
+    def award_options(self) -> list[str]:
+        """奖项申报选项（奖项基线表 + 中文标签）。"""
+        if not self.is_authenticated:
+            return []
+        try:
+            from xcpc_core.tier import api as tier_api
+
+            return [
+                f'{a.name}. {AWARD_LABELS.get(a.name, a.name)}'
+                for a in tier_api.list_award_levels()
+            ]
+        except Exception:
+            return []
+
+    @rx.var(cache=False)
+    def selected_contest(self) -> dict | None:
+        prefix = self.claim_contest.split(".", 1)[0].strip()
+        for contest in self.contests:
+            if contest["id"] == prefix:
+                return contest
         return None
 
     @rx.var(cache=False)
     def selected_is_team(self) -> bool:
-        event = self.selected_event
-        return event is not None and event["entity"] == "team"
+        contest = self.selected_contest
+        return contest is not None and contest["entity"] == "team"
+
+    @rx.var(cache=False)
+    def selected_is_award_only(self) -> bool:
+        contest = self.selected_contest
+        return contest is not None and contest["scoring"] == "award_only"
+
+    @rx.var(cache=False)
+    def selected_hint(self) -> str:
+        contest = self.selected_contest
+        if contest is None:
+            return ""
+        if contest["scoring"] == "award_only":
+            return "该比赛积分只由奖项决定：选择获奖等级即可，无需填解题数/名次。"
+        max_value = contest["max_value"] if contest["max_value"] is not None else "?"
+        n_teams = contest["n_teams"] if contest["n_teams"] is not None else "?"
+        return f"解题数上限 {max_value}，名次范围 1~{n_teams}。"
 
     @rx.var(cache=False)
     def my_teams(self) -> list[dict]:
@@ -107,11 +152,14 @@ class PointsState(AuthState):
         return [
             {
                 "id": c.id,
-                "event_title": c.event_title or f"#{c.event_id}",
+                "contest_title": c.contest_title or c.contest_id,
                 "entity_label": "队伍" if c.entity == "team" else "个人",
                 "owner_label": c.team_name or c.player_name or "-",
-                "value": c.value,
-                "rank": c.rank,
+                "result_label": (
+                    AWARD_LABELS.get(c.award or "", c.award)
+                    if c.award
+                    else f'解 {c.value} · 第 {c.rank} 名'
+                ),
                 "status_label": STATUS_LABELS.get(c.status, c.status),
                 "status": c.status,
             }
@@ -161,21 +209,32 @@ class PointsState(AuthState):
         if not self.is_bound:
             self.claim_error = "请先在个人资料页完成选手绑定"
             return
-        event = self.selected_event
-        if event is None:
-            self.claim_error = "请选择积分场次"
+        contest = self.selected_contest
+        if contest is None:
+            self.claim_error = "请选择比赛"
             return
-        try:
-            value = int(self.claim_value.strip())
-            rank = int(self.claim_rank.strip())
-        except ValueError:
-            self.claim_error = "解题数/得分与名次必须为正整数"
-            return
-        if value < 1:
-            self.claim_error = "积分资格线：解题数/得分至少为 1"
-            return
+
+        value: int | None = None
+        rank: int | None = None
+        award: str | None = None
+        if contest["scoring"] == "award_only":
+            award = self.claim_award.split(".", 1)[0].strip() or None
+            if not award:
+                self.claim_error = "请选择获奖等级"
+                return
+        else:
+            try:
+                value = int(self.claim_value.strip())
+                rank = int(self.claim_rank.strip())
+            except ValueError:
+                self.claim_error = "解题数/得分与名次必须为正整数"
+                return
+            if value < 1 or rank < 1:
+                self.claim_error = "解题数与名次至少为 1"
+                return
+
         team_id = None
-        if event["entity"] == "team":
+        if contest["entity"] == "team":
             prefix = self.claim_team_id.split(".", 1)[0].strip()
             team_id = prefix or None
             if not team_id:
@@ -184,9 +243,10 @@ class PointsState(AuthState):
         try:
             points_api.submit_claim(
                 params=PointsClaimCreate(
-                    event_id=event["id"],
+                    contest_id=contest["id"],
                     value=value,
                     rank=rank,
+                    award=award,
                     team_id=team_id,
                     note=self.claim_note.strip() or None,
                 ),
@@ -198,5 +258,6 @@ class PointsState(AuthState):
             return
         self.claim_value = ""
         self.claim_rank = ""
+        self.claim_award = ""
         self.claim_note = ""
         self.claim_feedback = "认证已提交，等待 admin 审核"

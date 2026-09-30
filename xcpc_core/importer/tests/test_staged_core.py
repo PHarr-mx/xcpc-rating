@@ -91,7 +91,7 @@ def test_stage_then_confirm_writes_everything(db_session, repo, xlsx):
     assert players == {"p001": "张三", "p002": "李四", "p003": "王五"}
     assert db_session.scalars(select(Team)).all() != []
     contest = db_session.get(Contest, "core_staged_c1")
-    assert contest is not None and contest.source_type == "formal"
+    assert contest is not None and contest.counts_for_ranking is True
     (batch,) = db_session.scalars(select(ImportBatch)).all()
     assert batch.status == "confirmed"
     # raw 归档写入临时仓库（而非真实仓库）

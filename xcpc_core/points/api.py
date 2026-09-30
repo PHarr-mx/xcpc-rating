@@ -2,6 +2,7 @@
 
 DI 注入模式与 importer.api 一致：``configure_session(session)`` 供测试/内嵌
 场景注入会话；未注入时各函数走默认工厂并自行管理生命周期。
+场次创建/配置已并入统一比赛（xcpc_core.contest.api.save_contest）。
 """
 
 from __future__ import annotations
@@ -16,9 +17,6 @@ from xcpc_core.points.models import (
     IndividualPointsRow,
     PointsClaimCreate,
     PointsClaimView,
-    PointsEventCreate,
-    PointsEventUpdate,
-    PointsEventView,
     TeamPointsRow,
 )
 
@@ -32,22 +30,6 @@ def configure_session(session: Session | None) -> None:
 
 def _session(session: Session | None) -> Session | None:
     return session or _default_session
-
-
-def create_event(*, params: PointsEventCreate, created_by: int, session: Session | None = None) -> PointsEventView:
-    return service.create_event(_session(session), params=params, created_by=created_by)
-
-
-def update_event(*, event_id: int, params: PointsEventUpdate, session: Session | None = None) -> PointsEventView:
-    return service.update_event(_session(session), event_id=event_id, params=params)
-
-
-def get_event(event_id: int, *, session: Session | None = None) -> PointsEventView:
-    return service.get_event(_session(session), event_id)
-
-
-def list_events(*, session: Session | None = None) -> list[PointsEventView]:
-    return service.list_events(_session(session))
 
 
 def submit_claim(
@@ -64,11 +46,11 @@ def submit_claim(
 
 def list_claims(
     *,
-    event_id: int | None = None,
+    contest_id: str | None = None,
     status: Literal["staged", "approved", "rejected"] | None = None,
     session: Session | None = None,
 ) -> list[PointsClaimView]:
-    return service.list_claims(_session(session), event_id=event_id, status=status)
+    return service.list_claims(_session(session), contest_id=contest_id, status=status)
 
 
 def my_claims(*, player_id: str, session: Session | None = None) -> list[PointsClaimView]:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from xcpc_core.rating.calculators import (
     BaseRatingCalculator,
+    ContestDispatcher,
     FormalCalculator,
     OjContestCalculator,
     OjPracticeCalculator,
@@ -24,6 +25,7 @@ from xcpc_core.rating.models import (
 class RatingEngine:
     def __init__(self, calculators: dict[str, BaseRatingCalculator] | None = None) -> None:
         self.calculators: dict[str, BaseRatingCalculator] = calculators or {
+            "contest": ContestDispatcher(),
             "formal": FormalCalculator(),
             "training": TrainingDispatcher(),
             "oj_contest": OjContestCalculator(),
@@ -74,8 +76,6 @@ class RatingEngine:
     def _filter(events: list[RatingEvent], *, mode: str, period: PeriodFilter) -> list[RatingEvent]:
         result: list[RatingEvent] = []
         for event in events:
-            if mode == "formal_only" and event.source_type != "formal":
-                continue
             if period.start is not None and event.date < period.start:
                 continue
             if period.end is not None and event.date > period.end:

@@ -14,22 +14,32 @@ from xcpc_core.rating.models import PeriodFilter
 
 
 def _seed_player_and_contests(session) -> None:
-    PlayerService(PlayerStore(session)).create_player(
-        PlayerCreate(name="张三", handle="zs", grade=2023)
-    )
+    service = PlayerService(PlayerStore(session))
+    service.create_player(PlayerCreate(name="张三", handle="zs", grade=2023))
+    service.create_player(PlayerCreate(name="李四", handle="ls", grade=2023))
     contest_service = ContestService(ContestStore(session))
-    # 三场分属：2025-秋学期（2025-09~2026-01）、2026-春学期、2026-暑假，均在 2025 赛年内
+    # 三场分属：2025-秋学期（2025-09~2026-01）、2026-春学期、2026-暑假，均在 2025 赛年内；
+    # 每场 2 队满足「入库实体 ≥ 2」护栏
     contest_service.save_contest(ContestCreate(
-        id="c_autumn", title="秋学期赛", date=date(2025, 10, 1), contest_type="icpc_school",
-        total_teams=10, standings=[Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"])],
+        id="c_autumn", title="秋学期赛", date=date(2025, 10, 1),
+        standings=[
+            Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
+            Standing(team_name="二队", rank=2, solved=4, player_ids=["p002"]),
+        ],
     ))
     contest_service.save_contest(ContestCreate(
-        id="c_spring", title="春学期赛", date=date(2026, 3, 15), contest_type="icpc_school",
-        total_teams=10, standings=[Standing(team_name="一队", rank=2, solved=5, player_ids=["p001"])],
+        id="c_spring", title="春学期赛", date=date(2026, 3, 15),
+        standings=[
+            Standing(team_name="一队", rank=2, solved=5, player_ids=["p001"]),
+            Standing(team_name="二队", rank=1, solved=6, player_ids=["p002"]),
+        ],
     ))
     contest_service.save_contest(ContestCreate(
-        id="c_summer", title="暑假赛", date=date(2026, 7, 1), contest_type="icpc_school",
-        total_teams=10, standings=[Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"])],
+        id="c_summer", title="暑假赛", date=date(2026, 7, 1),
+        standings=[
+            Standing(team_name="一队", rank=1, solved=5, player_ids=["p001"]),
+            Standing(team_name="二队", rank=2, solved=3, player_ids=["p002"]),
+        ],
     ))
 
 
@@ -61,13 +71,13 @@ def test_resolved_season_filter_actually_filters(db_session):
 
     autumn = PeriodFilter(type="season", id="2025-秋学期")
     snap = BoardService(db_session).build(mode="all", period=autumn)
-    (row,) = snap.rows
+    (row,) = [r for r in snap.rows if r.player_id == "p001"]
     assert row.event_count == 1  # 只算了秋学期那场
     assert snap.meta.start == date(2025, 9, 1) and snap.meta.end == date(2026, 1, 31)
 
     spring = PeriodFilter(type="season", id="2026-春学期")
     snap_spring = BoardService(db_session).build(mode="all", period=spring)
-    (row_spring,) = snap_spring.rows
+    (row_spring,) = [r for r in snap_spring.rows if r.player_id == "p001"]
     assert row_spring.event_count == 1 and row_spring.rating != row.rating
 
 
@@ -76,7 +86,7 @@ def test_resolved_competition_year_filters(db_session):
 
     cy2025 = PeriodFilter(type="competition_year", id="2025")
     snap = BoardService(db_session).build(mode="all", period=cy2025)
-    (row,) = snap.rows
+    (row,) = [r for r in snap.rows if r.player_id == "p001"]
     assert row.event_count == 3  # 三场都在 2025 赛年（2025-09 ~ 2026-08）
 
     cy2024 = PeriodFilter(type="competition_year", id="2024")

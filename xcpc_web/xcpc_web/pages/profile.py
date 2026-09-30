@@ -238,10 +238,9 @@ def _my_claims() -> rx.Component:
                 rx.table.root(
                     rx.table.header(
                         rx.table.row(
-                            rx.table.column_header_cell("场次"),
+                            rx.table.column_header_cell("比赛"),
                             rx.table.column_header_cell("主体"),
-                            rx.table.column_header_cell("解题/得分"),
-                            rx.table.column_header_cell("名次"),
+                            rx.table.column_header_cell("申报内容"),
                             rx.table.column_header_cell("状态"),
                         ),
                     ),
@@ -249,10 +248,9 @@ def _my_claims() -> rx.Component:
                         rx.foreach(
                             PointsState.my_claims,
                             lambda claim: rx.table.row(
-                                rx.table.cell(claim["event_title"]),
+                                rx.table.cell(claim["contest_title"]),
                                 rx.table.cell(claim["owner_label"]),
-                                rx.table.cell(claim["value"]),
-                                rx.table.cell(claim["rank"]),
+                                rx.table.cell(claim["result_label"]),
                                 rx.table.cell(
                                     rx.badge(
                                         claim["status_label"],

@@ -5,19 +5,8 @@ from ..states.board import BoardState
 
 
 def period_selector() -> rx.Component:
-    """周期选择器组件。"""
+    """周期选择器组件（比赛统一化后榜单只有单一口径，模式选择已移除）。"""
     return rx.hstack(
-        # 模式选择
-        rx.select.root(
-            rx.select.trigger(placeholder="选择模式"),
-            rx.select.content(
-                rx.select.item("全部比赛", value="all"),
-                rx.select.item("仅正式赛", value="formal_only"),
-            ),
-            value=BoardState.mode,
-            on_change=BoardState.set_mode_sync_url,
-            width="150px",
-        ),
         # 具体周期下拉：生涯 / 2025赛年 / 2025-秋学期 …（选项来自数据覆盖范围）
         rx.select.root(
             rx.select.trigger(placeholder="选择周期"),

@@ -41,7 +41,7 @@ def _seed(session) -> None:
     contest_service = ContestService(ContestStore(session))
     contest_service.save_contest(ContestCreate(
         id="c_team", title="省赛", date=date(2026, 5, 18),
-        contest_type="icpc_provincial", total_teams=100, school_teams_count=2, weight=70,
+        format="icpc", entity="team", n_teams=100, school_teams_count=2,
         standings=[Standing(
             team_name="一队", rank=3, solved=7, penalty=500, school_rank=1,
             award="gold", player_ids=["p001", "p002"],
@@ -49,7 +49,7 @@ def _seed(session) -> None:
     ))
     contest_service.save_contest(ContestCreate(
         id="c_oi", title="新生 OI", date=date(2026, 3, 1),
-        contest_type="icpc_school", format="oi", total_teams=20, weight=50,
+        format="ioi", entity="player", n_teams=20,
         standings=[Standing(rank=2, score=280, player_ids=["p001"])],
     ))
 
@@ -60,10 +60,11 @@ def test_on_load_loads_team_contest(build_state, core_store):
     st.on_load()
     assert st.not_found is False
     assert st.contest["title"] == "省赛"
-    assert st.contest["source_label"] == "正式赛"
-    assert st.contest["type_label"] == "组队 XCPC"
+    assert st.contest["type_label"] == "ICPC 赛制"
+    assert st.contest["entity_label"] == "团队赛"
+    assert st.contest["tier_label"] == "未分级"  # 未指定 tier → 兜底
     assert st.is_oi is False
-    assert "总队伍 100" in st.meta_line and "权重 70" in st.meta_line
+    assert "实体数 100" in st.meta_line
 
     (row,) = st.standings
     assert row["members"] == "张三、李四"  # 队员姓名已解析
@@ -79,7 +80,7 @@ def test_on_load_loads_oi_contest(build_state, core_store):
     assert st.is_oi is True
     (row,) = st.standings
     assert row["score"] == 280
-    assert row["team_name"] == "—"  # solo 无队名
+    assert row["team_name"] == "—"  # 个人赛无队名
     assert row["members"] == "张三"
 
 
@@ -87,7 +88,7 @@ def test_manually_added_star_marker(build_state, core_store):
     _seed(core_store)
     ContestService(ContestStore(core_store)).save_contest(ContestCreate(
         id="c_star", title="补录赛", date=date(2026, 6, 1),
-        contest_type="icpc_school", total_teams=10,
+        format="icpc", entity="team", n_teams=10,
         standings=[Standing(
             team_name="打星队", rank=1, solved=9, penalty=100,
             manually_added=True, player_ids=["p001"],

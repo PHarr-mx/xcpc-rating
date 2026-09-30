@@ -7,9 +7,10 @@ from pydantic import BaseModel, Field, model_validator
 
 from xcpc_core.utils.calendar import resolve_period_dates
 
-SourceType = Literal["formal", "training", "oj_contest", "oj_practice"]
+SourceType = Literal["contest", "formal", "training", "oj_contest", "oj_practice"]
 PeriodType = Literal["career", "competition_year", "season"]
-BoardMode = Literal["formal_only", "all"]
+# 「仅正式赛」口径随比赛统一化废弃：逐场 counts_for_ranking 取代 source_type 过滤
+BoardMode = Literal["all"]
 
 
 class RatingEvent(BaseModel):
