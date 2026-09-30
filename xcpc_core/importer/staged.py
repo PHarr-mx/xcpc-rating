@@ -44,7 +44,6 @@ from xcpc_core.importer.models import (
     StagedStanding,
     UnmatchedPlayer,
     UnmatchedTeam,
-    XcpcioParsedContest,
 )
 from xcpc_core.importer.weights import load_formal_weight
 from xcpc_core.importer.xcpcio_xlsx import parse_xcpcio_xlsx
@@ -80,8 +79,7 @@ def _resolve_session(session: Session | None) -> tuple[Session, bool]:
     return make_session_factory()[1](), True
 
 
-def _contest_meta(params: FormalImportParams, parsed: XcpcioParsedContest, *, repo_root: Path) -> dict[str, Any]:
-    weight, label = load_formal_weight(params.contest_type, repo_root=repo_root)
+def _contest_meta(params: FormalImportParams, *, weight: int, label: str) -> dict[str, Any]:
     source = "config"
     if params.weight_override is not None:
         weight = params.weight_override
@@ -105,7 +103,8 @@ def _payload_from_xlsx(
     params: FormalImportParams,
     *,
     session: Session,
-    repo_root: Path,
+    weight: int,
+    label: str,
 ) -> StagedImportPayload:
     parsed = parse_xcpcio_xlsx(
         path,
@@ -162,7 +161,7 @@ def _payload_from_xlsx(
     return StagedImportPayload(
         params=params,
         parsed=parsed,
-        contest_meta=_contest_meta(params, parsed, repo_root=repo_root),
+        contest_meta=_contest_meta(params, weight=weight, label=label),
         standings=staged_rows,
         unmatched_players=unmatched_players,
         unmatched_teams=unmatched_teams,
@@ -184,9 +183,11 @@ def stage_formal_xlsx(
     ``decisions`` 明确指定，避免在线导入盲目建号。
     """
     root = repo_root or find_repo_root()
+    # 参数前置校验：contest_type 在解析 xlsx 前对照权重表，拼错立刻报错
+    weight, label = load_formal_weight(params.contest_type, repo_root=root)
     session, close_session = _resolve_session(session)
     try:
-        payload = _payload_from_xlsx(Path(path), params, session=session, repo_root=root)
+        payload = _payload_from_xlsx(Path(path), params, session=session, weight=weight, label=label)
         batch = ImportBatch(
             uploaded_by=uploaded_by,
             filename=filename or Path(path).name,

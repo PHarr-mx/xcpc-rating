@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SourceFormat = Literal["xcpcio_xlsx"]
 
@@ -28,6 +28,8 @@ class XcpcioStandingRow(BaseModel):
 
 
 class XcpcioParsedContest(BaseModel):
+    """xlsx 解析结果 DTO。四个不变量由本模型保证，任何构造路径均不可绕过。"""
+
     source_format: SourceFormat = "xcpcio_xlsx"
     title: str
     total_teams: int
@@ -37,6 +39,18 @@ class XcpcioParsedContest(BaseModel):
     standings: list[XcpcioStandingRow]
     school_teams_total: int
     award_thresholds: AwardThresholds | None = None
+
+    @model_validator(mode="after")
+    def _check_invariants(self) -> "XcpcioParsedContest":
+        if self.total_teams <= 0:
+            raise ValueError("无法解析 total_teams")
+        if self.total_problems <= 0:
+            raise ValueError("无法解析 total_problems")
+        if self.school_teams_total <= 0:
+            raise ValueError("未匹配到任何本校队伍，请检查 school_organizations 或工作表名称")
+        if not self.standings:
+            raise ValueError("本校队伍均无金/银/铜奖，未写入任何成绩")
+        return self
 
 
 class FormalImportParams(BaseModel):
@@ -52,6 +66,23 @@ class FormalImportParams(BaseModel):
     default_grade: int | None = None
     weight_override: int | None = None
     weight_override_reason: str | None = None
+
+    @field_validator("contest_id")
+    @classmethod
+    def _contest_id_safe(cls, value: str) -> str:
+        """contest_id 直接拼进 data/raw/formal/{id}.json，禁止空白与路径穿越。"""
+        if not value or not value.strip():
+            raise ValueError("contest_id 不能为空")
+        if "/" in value or "\\" in value or ".." in value:
+            raise ValueError(f"contest_id 含非法字符（/ \\ ..）: {value}")
+        return value
+
+    @field_validator("contest_type")
+    @classmethod
+    def _contest_type_not_blank(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("contest_type 不能为空")
+        return value
 
 
 class UnmatchedPlayer(BaseModel):

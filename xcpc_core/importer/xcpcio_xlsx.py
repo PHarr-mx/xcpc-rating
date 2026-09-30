@@ -217,15 +217,8 @@ def parse_xcpcio_xlsx(
     finally:
         workbook.close()
 
-    if total_teams <= 0:
-        raise ValueError("无法解析 total_teams")
-    if total_problems <= 0:
-        raise ValueError("无法解析 total_problems")
-    if not school_rows:
-        raise ValueError("未匹配到任何本校队伍，请检查 school_organizations 或工作表名称")
-    if not standings:
-        raise ValueError("本校队伍均无金/银/铜奖，未写入任何成绩")
-
+    # 不变量（total_teams/total_problems > 0、本校队伍非空、有获奖）由
+    # XcpcioParsedContest 的 model_validator 在构造时强制，见 models.py。
     return XcpcioParsedContest(
         title=title,
         total_teams=total_teams,

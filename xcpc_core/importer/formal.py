@@ -249,6 +249,8 @@ def import_formal_xcpcio_xlsx(
 ) -> FormalImportResult:
     root = repo_root or find_repo_root()
     path = Path(path)
+    # 参数前置校验：contest_type 在打开任何文件前对照权重表，拼错立刻报错
+    weight, contest_type_label = load_formal_weight(params.contest_type, repo_root=root)
     session, close_session = _resolve_session(session)
     player_store = _player_store(session)
     team_store = _team_store(session)
@@ -275,7 +277,6 @@ def import_formal_xcpcio_xlsx(
             auto_create_players=params.auto_create_players,
         )
 
-    weight, contest_type_label = load_formal_weight(params.contest_type, repo_root=root)
     weight_source = "config"
     if params.weight_override is not None:
         weight = params.weight_override
