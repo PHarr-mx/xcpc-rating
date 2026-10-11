@@ -13,8 +13,8 @@
 |------|------|------|
 | [01-架构与数据流](01-架构与数据流.md) | 参考 | 架构、分层规则、包结构、数据流、SQLite 表与并发运维、配置文件 |
 | [02-选手与队伍](02-选手与队伍.md) | 参考 | Player / Team 数据模型、状态机、member_key 身份规则、API 与 CLI 速查 |
-| [03-比赛与导入](03-比赛与导入.md) | 参考 + 待建 | 三类数据源定义、正式赛导入全链路（已实现）、训练赛与 OJ 设计（待建） |
-| [04-Rating与榜单](04-Rating与榜单.md) | 参考 + 待建 | 事件模型、计算器体系、placeholder_v0 现状、榜单结构、缓存失效 |
+| [03-比赛与导入](03-比赛与导入.md) | 参考 + 待建 | 统一比赛模型（tier/双开关/计分方式）、正式赛导入全链路（已实现）、通用 JSON 导入与 OJ 设计（待建） |
+| [04-Rating与榜单](04-Rating与榜单.md) | 参考 + 待建 | 统一事件模型、AtCoder 式重放引擎（atcoder_v1）、榜单结构、缓存失效 |
 | [05-Web与认证](05-Web与认证.md) | 参考 + 待建 | Reflex 分层、路由与 State 清单、已实现页面、认证与权限、Web 测试基建 |
 | [06-部署与运维](06-部署与运维.md) | 待建 | Caddy + systemd + 备份 cron（五期，全部未实施） |
 | [07-开发流程](07-开发流程.md) | 指南 | 环境、编码约定、开发循环、避坑清单、AI Agent 协作 |
@@ -28,15 +28,15 @@
 |------|------|----------|------|
 | 选手 / 队伍 CRUD | ✅ 已实现 | `xcpc_core/player/` `xcpc_core/team/` | 02 |
 | 正式赛导入（xlsx 一步式 + Web 五步 staged） | ✅ 已实现 | `xcpc_core/importer/` | 03 |
-| 比赛存储（formal/training 合表） | ✅ 已实现 | `xcpc_core/contest/` | 01 / 03 |
-| Rating 引擎 | 🔨 placeholder_v0（公式待定） | `xcpc_core/rating/` | 04 |
+| 统一比赛 + 赛事等级（tier/awardlevel）+ 积分制 | ✅ 已实现（P-U1，2026-10-01） | `xcpc_core/contest/` `xcpc_core/tier/` `xcpc_core/points/` | 01 / 03 |
+| Rating 引擎（AtCoder 式重放，atcoder_v1） | ✅ 已实现（P-U2，2026-10-01） | `xcpc_core/rating/` | 04 |
 | 榜单聚合 + 缓存失效 | ✅ 已实现 | `xcpc_core/board/` + `xcpc_core/db/meta.py` | 04 |
 | Web 骨架 / 榜单页 / 认证 / 管理后台 / 在线导入 | ✅ 已实现 | `xcpc_web/` | 05 |
-| 详情页（选手 / 比赛）/ 权重试算页 / 图表 | ⬜ 未开始 | — | 05 / 08 |
-| 训练赛录入 / OJ 数据源 | ⬜ 未开始（表结构与配置已备） | — | 03 |
+| 详情页（选手 / 比赛）/ 图表 | ✅ 已实现 | `xcpc_web/` | 05 |
+| 权重试算页 / 通用 JSON 导入（P-U3）/ OJ 数据源 | ⬜ 未开始 | — | 03 / 08 |
 | 部署上线（systemd / Caddy / 备份） | ⬜ 未开始 | — | 06 |
 
-进度与剩余工作的权威来源是 [08-路线图](08-路线图.md)；粗粒度进度日志见根目录 [PROGRESS.md](../PROGRESS.md)。
+进度与剩余工作的权威来源是 [08-路线图](08-路线图.md)；比赛统一化规格见根目录 CONTEST_UNIFICATION_PLAN.md。
 
 ## 3. 文档约定
 

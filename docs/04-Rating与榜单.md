@@ -66,7 +66,7 @@ g 空间平均 = 赢大分、输小分；f(1)=1200 收敛到 0——恒定打出
 
 **周期榜语义**：生涯榜全史重放；赛年/赛季榜从周期起点以全 Center 重放窗口内事件。
 
-### 2.2 统一比赛 / OJ：placeholder_v0（过渡）
+### 2.2 旧逐事件计算器（placeholder_v0，保留未消费）
 
 | 计算器 | 公式 |
 |--------|------|
@@ -76,7 +76,7 @@ g 空间平均 = 赢大分、输小分；f(1)=1200 收敛到 0——恒定打出
 | OJ 比赛 | `max(0, delta)` |
 | OJ 做题 | `rating_numeric * 0.5 + solve_count * 2` |
 
-数值无业务含义；积分激励由「生涯积分制」（第二轨）承担，已改挂统一 contest（积分公式见 CONTEST_UNIFICATION_PLAN §2.6）。
+数值无业务含义，且 P-U2 起榜单不再消费这些计算器（统一比赛走 AtCoder 重放）；OJ 计算器为未来数据源预留。积分激励由「生涯积分制」（第二轨）承担，已改挂统一 contest（积分公式见 CONTEST_UNIFICATION_PLAN §2.6）。
 
 ## 3. 公式方向定案记录（原四期定案清单）
 
@@ -121,13 +121,14 @@ g 空间平均 = 赢大分、输小分；f(1)=1200 收敛到 0——恒定打出
 ```python
 BoardSnapshot(
     meta=BoardMeta(mode, period_type, period_id, period_label, start, end,
-                   algorithm="placeholder_v0", data_version, tie_break, generated_at),
+                   algorithm="atcoder_v1", data_version, tie_break, generated_at),
     rows=[BoardRow(rank, player_id, name, grade_label, rating, event_count, delta_recent)],
 )
 ```
 
-- **排名规则**：rating 降序；同分按 player_id 字典序（稳定可复现）；竞赛排名 1, 2, 2, 4（同分同 rank、下一名跳号）
-- `delta_recent`：周期内最近一次事件对该选手的得分贡献
+- **排名规则**：rating 降序；同分按 player_id 字典序（稳定可复现）；竞赛排名 1, 2, 2, 4（同分同 rank、下一名跳号）。AtCoder 语义下同队同分常态化——前端保留核心 rank，不得按行序重新编号
+- `rating`：该选手重放序列最后一场的 rating_after（生涯=全史重放；赛年/赛季=窗口全 Center 重放）
+- `delta_recent`：最近一场的 Rating 变化（首场相对 0 起点计）
 - 离队（`left`）选手不出现在榜单；退役（`retired`）保留；年级展示用入学年（`grade=0` 显示「未设置」）
 - 生成时间等 meta 展示在榜单页脚（含 data_version，供确认数据新鲜度）
 
