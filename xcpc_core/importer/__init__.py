@@ -1,7 +1,11 @@
+from xcpc_core.importer.contest_json import import_contest_json
 from xcpc_core.importer.formal import add_formal_team, import_formal_xcpcio_xlsx
 from xcpc_core.importer.models import (
     AddFormalTeamParams,
     AddFormalTeamResult,
+    ContestJsonDocument,
+    ContestJsonImportResult,
+    ContestJsonStandingRow,
     FormalImportParams,
     FormalImportResult,
     XcpcioParsedContest,
@@ -14,10 +18,14 @@ from xcpc_core.importer.api import (
 __all__ = [
     "AddFormalTeamParams",
     "AddFormalTeamResult",
+    "ContestJsonDocument",
+    "ContestJsonImportResult",
+    "ContestJsonStandingRow",
     "FormalImportParams",
     "FormalImportResult",
     "XcpcioParsedContest",
     "add_formal_team",
+    "import_contest_json",
     "import_formal_xcpcio_xlsx",
     "parse_xcpcio_xlsx",
     "stage_formal_xlsx",

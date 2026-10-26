@@ -105,13 +105,176 @@ def _actions() -> rx.Component:
 
 def _content() -> rx.Component:
     return rx.vstack(
-        rx.heading("在线正式赛导入", size="7"),
-        rx.text("上传与解析阶段只写 ImportBatch(staged)；确认成功后才写选手、队伍、比赛和 raw 归档。", color_scheme="gray"),
+        rx.heading("在线导入", size="7"),
+        rx.text(
+            "两条通道并列：正式赛 xlsx（五步 staged，可人工决议未匹配选手）"
+            "与通用比赛 JSON（元信息在文件内，预览后确认）。",
+            color_scheme="gray",
+        ),
         _steps(), _feedback(), _upload(),
         rx.cond(AdminImportState.batch_id > 0, _preview()),
         rx.cond(AdminImportState.unmatched_players.length() > 0, _matching()),
         rx.cond(AdminImportState.batch_id > 0, _actions()),
+        _json_channel(),
         spacing="5", width="100%", max_width="90em",
+    )
+
+
+def _json_channel() -> rx.Component:
+    """通用比赛 JSON 通道（P-U3）：与 xlsx 五步并列的独立入口。"""
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.heading("通用比赛 JSON", size="4"),
+                rx.badge("训练赛 / 个人赛 / IOI 制", color_scheme="violet", size="1"),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                "元信息写在 JSON 文件里（contest_id / 日期 / 赛制 / 形式 / 等级 / 双开关），"
+                "因此不需要填表。上传后先做只读预览——看清哪些选手已匹配、哪些将新建、"
+                "哪些姓名有歧义——确认后才写库。",
+                size="2",
+                color_scheme="gray",
+            ),
+            rx.upload(
+                rx.button("选择 JSON 文件", variant="soft"),
+                id="contest-json-upload",
+                accept={"application/json": [".json"]},
+                max_files=1,
+                on_drop=AdminImportState.handle_json_upload,
+            ),
+            rx.cond(
+                AdminImportState.json_has_preview,
+                rx.vstack(
+                    rx.separator(size="4"),
+                    rx.hstack(
+                        rx.badge(AdminImportState.json_header["title"], color_scheme="blue", size="2"),
+                        rx.badge(AdminImportState.json_header["tier_name"], color_scheme="gray", size="2"),
+                        rx.badge(AdminImportState.json_header["format_entity"], color_scheme="violet", size="2"),
+                        rx.badge(AdminImportState.json_header["rows_label"], color_scheme="gray", size="2"),
+                        rx.badge(AdminImportState.json_header["to_create_label"], color_scheme="orange", size="2"),
+                        rx.cond(
+                            AdminImportState.json_header["existing"],
+                            rx.badge("同 ID 比赛已存在，将覆盖", color_scheme="red", size="2"),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        wrap="wrap",
+                    ),
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("#", width="50px"),
+                                rx.table.column_header_cell("队伍/选手"),
+                                rx.table.column_header_cell("成员"),
+                                rx.table.column_header_cell("名次", width="70px"),
+                                rx.table.column_header_cell("状态"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(
+                                AdminImportState.json_rows,
+                                lambda row: rx.table.row(
+                                    rx.table.cell(row["index"]),
+                                    rx.table.cell(row["name"]),
+                                    rx.table.cell(row["members"]),
+                                    rx.table.cell(row["rank"]),
+                                    rx.table.cell(
+                                        rx.cond(
+                                            row["blocked"],
+                                            rx.badge(row["status"], color_scheme="red", variant="soft"),
+                                            rx.text(row["status"], size="2", color_scheme="gray"),
+                                        )
+                                    ),
+                                ),
+                            )
+                        ),
+                        width="100%",
+                    ),
+                    rx.cond(
+                        AdminImportState.json_ambiguous.length() > 0,
+                        rx.vstack(
+                            rx.separator(size="4"),
+                            rx.heading("姓名歧义处理", size="3"),
+                            rx.text(
+                                "以下姓名在名册中匹配到多人。请为每人指定对应选手，"
+                                "或选择「新建」为其建档；未决议的行在写入时会被跳过。",
+                                size="2",
+                                color_scheme="orange",
+                            ),
+                            rx.table.root(
+                                rx.table.header(
+                                    rx.table.row(
+                                        rx.table.column_header_cell("队伍"),
+                                        rx.table.column_header_cell("姓名"),
+                                        rx.table.column_header_cell("决议"),
+                                    )
+                                ),
+                                rx.table.body(
+                                    rx.foreach(
+                                        AdminImportState.json_ambiguous,
+                                        lambda row: rx.table.row(
+                                            rx.table.cell(row["team"]),
+                                            rx.table.cell(row["name"]),
+                                            rx.table.cell(
+                                                rx.select(
+                                                    AdminImportState.json_decision_options,
+                                                    value=row["current"],
+                                                    placeholder="选择选手 ID 或 new",
+                                                    on_change=lambda value: AdminImportState.set_json_decision(
+                                                        row["name"], value
+                                                    ),
+                                                    width="100%",
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                width="100%",
+                            ),
+                            rx.text(
+                                f"未决议：{AdminImportState.json_unresolved_count} 人",
+                                size="1",
+                                color_scheme="gray",
+                            ),
+                            spacing="2",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        AdminImportState.json_header["blocked"],
+                        rx.callout(
+                            "上表未决议的姓名，其所在队伍在写入时会被跳过。",
+                            icon="triangle_alert",
+                            color_scheme="orange",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.hstack(
+                        rx.button(
+                            "确认写入",
+                            on_click=AdminImportState.confirm_json_import,
+                            color_scheme="green",
+                        ),
+                        rx.button(
+                            "取消",
+                            on_click=AdminImportState.discard_json_import,
+                            variant="ghost",
+                        ),
+                        spacing="3",
+                    ),
+                    spacing="3",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        width="100%",
     )
 
 

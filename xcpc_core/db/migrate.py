@@ -72,22 +72,32 @@ def migrate_teams(session, *, today: date, plog: Plog, repo_root: Path) -> int:
 
 
 def migrate_formal_contests(session, *, plog: Plog, repo_root: Path) -> int:
-    raw_dir = repo_root / "data/raw/formal"
-    files = sorted(raw_dir.glob("*.json")) if raw_dir.is_dir() else []
+    """重灌两个 raw 归档目录：``raw/formal/``（正式赛 xlsx）与 ``raw/contests/``（P-U3 通用 JSON）。"""
+    from xcpc_core.importer.formal_store import iter_raw_contest_files
+
+    files = iter_raw_contest_files(repo_root)
     store = ContestStore(session)
     # raw 文档 → 统一比赛 DTO 的映射与正式赛导入共用一套（含 tier 解析）
-    from xcpc_core.importer.formal import _contest_create_from_document
+    from xcpc_core.importer.contest_json import _contest_create_from_document as _json_to_contest
+    from xcpc_core.importer.formal import _contest_create_from_document as _formal_to_contest
+    from xcpc_core.tier.api import ensure_fallback_tier, find_tier_by_name
 
     count = 0
     for path in files:
         with path.open(encoding="utf-8") as file:
             doc = json.load(file)
-        contest = _contest_create_from_document(
-            doc, source_file=f"raw/formal/{path.name}", session=session
-        )
+        # source_file 写成相对仓库根的 posix 路径，与导入写入时一致
+        source_rel = path.relative_to(repo_root).as_posix()
+        if doc.get("source_format") == "contest_json":
+            tier = find_tier_by_name(doc.get("tier", ""), session=session) or ensure_fallback_tier(
+                session=session
+            )
+            contest = _json_to_contest(doc, source_file=source_rel, tier_id=tier.id, session=session)
+        else:
+            contest = _formal_to_contest(doc, source_file=source_rel, session=session)
         save_contest(contest, store=store)
         count += 1
-        plog.info("正式赛迁移完成", contest_id=contest.id, standings=len(contest.standings))
+        plog.info("比赛迁移完成", contest_id=contest.id, standings=len(contest.standings), source=source_rel)
     return count
 
 

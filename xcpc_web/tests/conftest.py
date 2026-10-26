@@ -53,7 +53,8 @@ from xcpc_core.audit import api as audit_api  # noqa: E402
 from xcpc_core.board import api as board_api  # noqa: E402
 from xcpc_core.importer import api as importer_api  # noqa: E402
 from xcpc_core.rating import api as rating_api  # noqa: E402
-from xcpc_core.points import api as points_api  # noqa: E402
+from xcpc_core.points import api as points_api
+from xcpc_core.rating import lab as rating_lab  # noqa: E402
 from xcpc_core.tier import api as tier_api  # noqa: E402
 
 from xcpc_web.states.auth import AuthState  # noqa: E402
@@ -97,6 +98,7 @@ def core_store():
     board_api.configure_session(session)
     points_api.configure_session(session)
     tier_api.configure_session(session)
+    rating_lab.configure_session(session)
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
@@ -108,6 +110,7 @@ def core_store():
     board_api.configure_session(None)
     points_api.configure_session(None)
     tier_api.configure_session(None)
+    rating_lab.configure_session(None)
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -183,3 +186,30 @@ def build_state(web_engine):
         return state
 
     return _build
+
+@pytest.fixture(autouse=True)
+def isolate_repo_root(tmp_path, monkeypatch):
+    """把 importer / lab 的 repo_root 重定向到临时目录。
+
+    导入类测试（xlsx staged 确认、通用 JSON 写入）会写 `data/raw/` 归档与
+    `data/config/` 产物；不隔离就会污染真实仓库（曾泄漏过
+    `data/raw/contests/<id>.json`）。复制两份 config，保证 tier 种子与
+    学校匹配名可用。
+    """
+    import shutil
+
+    from xcpc_core.player.store import find_repo_root
+
+    real_root = find_repo_root()
+    (tmp_path / "data/config").mkdir(parents=True, exist_ok=True)
+    for name in ("contest_weights.yaml", "school.yaml"):
+        source = real_root / "data" / "config" / name
+        if source.is_file():
+            shutil.copy(source, tmp_path / "data" / "config" / name)
+    (tmp_path / "data/raw/formal").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data/raw/contests").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("xcpc_core.importer.contest_json.find_repo_root", lambda: tmp_path)
+    monkeypatch.setattr("xcpc_core.importer.formal.find_repo_root", lambda: tmp_path, raising=False)
+    monkeypatch.setattr("xcpc_core.rating.lab.find_repo_root", lambda: tmp_path, raising=False)
+    yield tmp_path

@@ -20,7 +20,7 @@ from collections import defaultdict
 from typing import Any
 
 from xcpc_core.rating.formula import aperf_from_history, rating_from_history, solve_perf
-from xcpc_core.rating.formula_params import CENTER, FIRST_PERF_INFLATION
+from xcpc_core.rating.formula_params import DEFAULT, FormulaParams
 from xcpc_core.rating.models import PeriodFilter, RatingEvent, ReplayEventScore
 
 
@@ -32,7 +32,14 @@ def _perf_weights(hist: list[tuple[float, int]]) -> tuple[list[float], list[int]
 
 
 class AtcoderReplayEngine:
-    """按场次 × 日期重放统一比赛事件流（source_type=contest，P-U2 起榜单数据源）。"""
+    """按场次 × 日期重放统一比赛事件流（source_type=contest，P-U2 起榜单数据源）。
+
+    ``params`` 缺省用 ``formula_params.DEFAULT``；权重试算页（P6）传入覆盖实例，
+    即可在不改全局常量、不碰缓存的前提下对比不同参数下的榜单。
+    """
+
+    def __init__(self, *, params: FormulaParams | None = None) -> None:
+        self.params = params or DEFAULT
 
     def compute_series(
         self,
@@ -103,11 +110,11 @@ class AtcoderReplayEngine:
                 hist = teams.get(entrant["team_id"]) if entrant["team_id"] else personal.get(entrant["key"])
             if hist:
                 perfs, weights = _perf_weights(hist)
-                aperf = aperf_from_history(perfs, weights)
-                entrant["prior"] = CENTER if aperf is None else aperf
+                aperf = aperf_from_history(perfs, weights, params=self.params)
+                entrant["prior"] = self.params.center if aperf is None else aperf
                 entrant["first_contest"] = False
             else:
-                entrant["prior"] = CENTER
+                entrant["prior"] = self.params.center
                 entrant["first_contest"] = not entrant["unofficial"]
             priors.append(entrant["prior"])
 
@@ -115,10 +122,10 @@ class AtcoderReplayEngine:
         for entrant in entrants:
             avg_rank = entrant["avg_rank"]
             if avg_rank not in solved:
-                solved[avg_rank] = solve_perf(avg_rank, priors)
+                solved[avg_rank] = solve_perf(avg_rank, priors, params=self.params)
             perf = solved[avg_rank]
             if entrant["first_contest"]:
-                perf = (perf - CENTER) * FIRST_PERF_INFLATION + CENTER
+                perf = (perf - self.params.center) * self.params.first_perf_inflation + self.params.center
             entrant["perf"] = perf
 
         for entrant in entrants:
@@ -135,7 +142,7 @@ class AtcoderReplayEngine:
                     ReplayEventScore(
                         date=first.date,
                         perf=perf,
-                        rating_after=rating_from_history(perfs, weights),
+                        rating_after=rating_from_history(perfs, weights, params=self.params),
                     )
                 )
 

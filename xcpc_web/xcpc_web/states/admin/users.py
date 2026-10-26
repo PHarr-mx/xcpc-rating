@@ -103,6 +103,188 @@ class AdminUsersState(AdminState):
             for up, lu in rows
         ]
 
+
+    # ---- 批量建号（五期：不允许自助注册，账号由管理员统一创建）----
+
+    batch_text: str = ""
+    batch_default_password: str = ""
+    batch_result: list[dict] = []
+
+    def set_batch_text(self, value: str) -> None:
+        self.batch_text = value
+
+    def set_batch_default_password(self, value: str) -> None:
+        self.batch_default_password = value
+
+    @rx.event
+    def clear_batch(self):
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self.batch_text = ""
+        self.batch_default_password = ""
+        self.batch_result = []
+        self.admin_error = ""
+        self.admin_feedback = ""
+        return None
+
+    @rx.event
+    def submit_batch(self):
+        """批量建号。
+
+        每行格式：``用户名[,初始密码][,绑定选手ID]``
+        - 只写用户名 → 用「默认初始密码」
+        - 密码留空但给了选手 → 用默认密码
+        - 绑定选手可选，指定时直接写 bound_player_id（须未被他人绑定）
+
+        **逐行独立事务**：某行失败不影响其他行，结果逐行报告（成功/跳过/失败）。
+        """
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self.admin_error = ""
+        self.admin_feedback = ""
+
+        raw_lines = [ln.strip() for ln in (self.batch_text or "").splitlines()]
+        lines = [ln for ln in raw_lines if ln and not ln.startswith("#")]
+        if not lines:
+            self.admin_error = "请至少填写一行（格式：用户名[,密码][,选手ID]）"
+            return None
+
+        default_pw = (self.batch_default_password or "").strip()
+        results: list[dict] = []
+        created = 0
+
+        for line in lines:
+            parts = [p.strip() for p in line.replace("，", ",").split(",")]
+            username = parts[0] if parts else ""
+            password = parts[1] if len(parts) > 1 and parts[1] else default_pw
+            player_id = parts[2] if len(parts) > 2 else ""
+
+            outcome = self._create_one(
+                username=username,
+                password=password,
+                player_id=player_id or None,
+            )
+            results.append({"line": line, "username": username, **outcome})
+            if outcome["status"] == "created":
+                created += 1
+
+        self.batch_result = results
+        skipped = sum(1 for r in results if r["status"] == "skipped")
+        failed = sum(1 for r in results if r["status"] == "failed")
+        self.admin_feedback = f"完成：成功 {created} 个，跳过 {skipped} 个，失败 {failed} 个"
+        if created:
+            self._audit_batch(created, skipped, failed)
+        return None
+
+    def _create_one(
+        self, *, username: str, password: str, player_id: str | None
+    ) -> dict:
+        """建单个账号。返回 ``{"status": created|skipped|failed, "message": str}``。"""
+        from reflex_local_auth import LocalUser
+
+        if not username:
+            return {"status": "failed", "message": "用户名为空"}
+        if len(username) < 3:
+            return {"status": "failed", "message": "用户名至少 3 位"}
+        if not password or len(password) < 6:
+            return {"status": "failed", "message": "密码至少 6 位（或设置默认初始密码）"}
+
+        try:
+            with rx.session() as session:
+                exists = session.exec(
+                    select(LocalUser).where(LocalUser.username == username)
+                ).one_or_none()
+                if exists is not None:
+                    return {"status": "skipped", "message": "用户名已存在"}
+
+                if player_id:
+                    taken = session.exec(
+                        select(UserProfile).where(UserProfile.bound_player_id == player_id)
+                    ).one_or_none()
+                    if taken is not None:
+                        return {
+                            "status": "failed",
+                            "message": f"选手 {player_id} 已被 user#{taken.user_id} 绑定",
+                        }
+
+                user = LocalUser()
+                user.username = username
+                user.password_hash = LocalUser.hash_password(password)
+                user.enabled = True
+                session.add(user)
+                session.flush()
+                session.refresh(user)
+                if user.id is None:
+                    return {"status": "failed", "message": "创建失败（无 ID）"}
+                session.add(
+                    UserProfile(
+                        user_id=user.id,
+                        role="member",
+                        bound_player_id=player_id or None,
+                    )
+                )
+                session.commit()
+                user_id = user.id
+        except Exception as exc:  # 逐行隔离：一行失败不影响其他行
+            return {"status": "failed", "message": str(exc)}
+
+        return {
+            "status": "created",
+            "message": "已创建" + (f"，并绑定 {player_id}" if player_id else ""),
+            "user_id": user_id,
+        }
+
+    def _audit_batch(self, created: int, skipped: int, failed: int) -> None:
+        try:
+            audit_record(
+                action="user.batch_create",
+                target="admin_users",
+                user_id=self.authenticated_user.id,
+                diff_json={
+                    "created": created,
+                    "skipped": skipped,
+                    "failed": failed,
+                    "usernames": [
+                        r["username"] for r in self.batch_result if r["status"] == "created"
+                    ],
+                },
+            )
+        except Exception:
+            pass
+
+    @rx.var(cache=False)
+    def batch_rows(self) -> list[dict]:
+        """批量结果视图（含配色，避免在模板里做字符串比较以外的判断）。"""
+        if not self.is_admin:
+            return []
+        return [
+            {
+                "line": r["line"],
+                "username": r["username"],
+                "status": r["status"],
+                "label": {"created": "成功", "skipped": "跳过", "failed": "失败"}.get(
+                    r["status"], r["status"]
+                ),
+                "tone": {"created": "green", "skipped": "gray", "failed": "red"}.get(
+                    r["status"], "gray"
+                ),
+                "message": r["message"],
+            }
+            for r in self.batch_result
+        ]
+
+    @rx.var(cache=False)
+    def player_options(self) -> list[str]:
+        """绑定下拉可选选手（含已离队，便于补建历史账号）。"""
+        if not self.is_admin:
+            return []
+        try:
+            return [p.id for p in player_api.list_players(include_left=True)]
+        except Exception:
+            return []
+
     # ---- 辅助查询（非事件/非 var）----
 
     def _username_map(self, user_ids: set[int]) -> dict[int, str]:

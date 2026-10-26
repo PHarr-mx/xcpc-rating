@@ -71,8 +71,24 @@ def review_claim(
     return service.review_claim(_session(session), claim_id=claim_id, decision=decision, decided_by=decided_by)
 
 
+def auto_record_contest_points(
+    *,
+    contest_id: str,
+    created_by: int,
+    replace: bool = True,
+    session: Session | None = None,
+) -> list[PointsClaimView]:
+    """P4 免认证直录：从 standings 批量生成 approved 认证与流水。"""
+    return service.auto_record_contest_points(
+        _session(session), contest_id=contest_id, created_by=created_by, replace=replace
+    )
+
+
 def individual_leaderboard(
-    *, start: date | None = None, end: date | None = None, session: Session | None = None
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    session: Session | None = None,
 ) -> list[IndividualPointsRow]:
     return service.individual_leaderboard(_session(session), start=start, end=end)
 

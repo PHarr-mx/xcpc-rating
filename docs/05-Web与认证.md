@@ -6,7 +6,7 @@ Reflex 应用（`xcpc_web/`，锁 0.9.7）。Web 层只做 UI 与状态：**不�
 State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 state var」。
 
 > 实现状态：榜单页、认证、`/profile`、管理后台 9 页（含在线导入五步与比赛统一化新页）、
-> 积分页（认证提交 + 双榜）、选手/比赛详情页均已上线；权重试算页待建。
+> 积分页（认证提交 + 双榜）、选手/比赛详情页、权重试算页均已上线。
 
 ---
 
@@ -34,10 +34,11 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 |------|------|------|------|
 | `/` | 榜单（默认 all + career；筛选同步 URL query） | guest | ✅ |
 | `/about` | 数据与赛季说明（静态） | guest | ✅ |
-| `/login` `/register` | 认证 | guest | ✅ |
+| `/login` | 登录 | guest | ✅ |
+| `/register` | **建号（admin-only）**：五期关闭自助注册后改为管理员单人建号；非管理员只看到说明 | admin | ✅ 2026-10-26 |
 | `/profile` | 我的资料、OJ 账号、绑定状态 | member | ✅ |
 | `/admin` | 概览 + 待审批计数 | admin | ✅ |
-| `/admin/users` | 用户与绑定审批 | admin | ✅ |
+| `/admin/users` | 用户与绑定审批 + **批量建号** | admin | ✅ 2026-10-26（批量建号） |
 | `/admin/players` | 选手 CRUD | admin | ✅ |
 | `/admin/teams` | 队伍 CRUD | admin | ✅ |
 | `/admin/contests` | 统一比赛管理：创建表单（赛制/形式/等级/双开关/计分方式）+ 列表与删除（P-U1） | admin | ✅ |
@@ -45,10 +46,10 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `/admin/points` | 积分认证审批（场次创建已并入比赛管理；P-U1） | admin | ✅ |
 | `/points` | 生涯积分：提交认证（按 scoring 切换表单）+ 我的认证 + 个人/队伍双榜 | member | ✅ |
 | `/admin/audit` | 审计日志筛选（只读） | admin | ✅ |
-| `/admin/import` | xlsx 在线导入五步 | admin | ✅ |
+| `/admin/import` | 在线导入两通道：正式赛 xlsx 五步 staged + 通用比赛 JSON 两段（预览→确认） | admin | ✅ 2026-10-26（JSON 通道） |
 | `/players/{player_id}` | 选手详情：档案 + OJ 外链 + Rating 曲线 + 参赛记录；绑定本人显示「编辑我的资料」 | guest | ✅ 2026-09-11 |
 | `/contests/{contest_id}` | 比赛详情：元信息行 + 成绩表按 format 切列（xcpc：解题/罚时；oi：得分）；队员姓名解析、打星标记、奖项中文 | guest | ✅ 2026-09-14 |
-| `/admin/rating` | 权重试算 | admin | ⬜（P6，前置公式已定案） |
+| `/admin/rating` | 权重试算：左调公式参数、右看与当前榜单逐人 diff；试算不落库不进缓存，「应用」写 YAML + bump + 审计 | admin | ✅ 2026-10-26 |
 
 路由注册：`xcpc_web/xcpc_web.py`（`app.add_page`，含各页 `on_load`）。
 
@@ -62,7 +63,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `AdminState`（基类） | 权限守卫 `_require_admin()` | ✅ |
 | `AdminOverview/Users/Players/Teams/Contests/Tiers/Points/Audit/ImportState` | 管理后台 9 页 | ✅ |
 | `PlayerDetailState` / `ContestDetailState` | 详情页（均 ✅：选手 2026-09-11、比赛 2026-09-14） | ✅ |
-| `RatingLabState` | 权重试算（draft_weights / preview_rows / diff_vs_current） | ⬜ |
+| `RatingLabState` | 权重试算（draft 参数 / preview_rows / baseline_params / summary） | ✅ |
 
 `BoardState` 要点：mode/period_type/period_id/search/sort_by；`@rx.var(cache=True)` 调 `board_api.board()`；
 **筛选同步 URL query 已实现**——`on_load` 从 `router.page.params` 恢复（非法值白名单忽略），
@@ -78,7 +79,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 
 ## 6. 页面与组件实现要点
 
-> 本表原为「待建清单」，P5 落地后转为**实现要点记录**（仅 `/admin/rating` 仍待建）。
+> 本表原为「待建清单」，P5/P6 落地后转为**实现要点记录**（全部已实现）。
 
 | 项 | 设计要点 |
 |----|----------|
@@ -88,7 +89,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `oj_link.py` ✅ | 平台 profile 外链；URL 与展示文案在 State 侧预算成视图 dict（Var 不能构建期逐项分支；url 空串表示无链，避免 rx.cond 分支构建期 href=None 报错） |
 | ~~`form_fields.py`~~ | 已取消：P5 各页无需抽象表单控件，admin 页各有表单模式，避免无用抽象 |
 | `rating_chart.py` ✅ | Rating 累计折线。**用 Reflex 内置 recharts 替代原计划的 plotly**——单折线场景够用、零新增依赖、无产物体积负担 |
-| `/admin/rating` ⬜ | 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump data_version + 记 `weights.apply` 审计（P6 待建） |
+| `/admin/rating` ✅ | 左调公式参数右看 diff；试算不落库不进缓存，「应用」才写 `data/config/rating_params.yaml` + bump data_version + 记 `weights.apply` 审计。参数见 `rating/formula_params.py`，服务在 `rating/lab.py` |
 
 动态路由要点：`route="/players/[player_id]"`；参数运行时合并进 `router.page.params`（与 query 同通道），`on_load` 读取；`is_self` 直接读路由参数不依赖 on_load 时序。
 
@@ -130,6 +131,24 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 结论：真正的防护只有**事件处理器 + computed var**两处；`on_load`/`require_login` 是体验层。三处都要写，但作用要分清。`bound_player_id` 是 computed var 每次从会话推导，**不缓存在可写 state var**——否则客户端可借 setter 覆盖它改别人的选手。
 
+### 7.3b 建号（不开放自助注册）
+
+五期定案（2026-10-26）：**不允许个人注册**，账号一律由管理员创建。两条入口：
+
+| 入口 | 场景 | 特点 |
+|------|------|------|
+| `/register`（admin-only） | 零星建 1–2 个 | 原注册页改造；非 admin 只看到「仅限管理员」说明，无表单 |
+| `/admin/users` 批量表单 | 首批开通、整届成员 | 每行 `用户名[,初始密码][,绑定选手ID]`，逐行独立事务 + 逐行结果 |
+
+两条入口都：服务端事件处理器内校验 admin（`rx.cond` 隐藏不是安全边界）、
+新账号默认 `member` 角色、写 `user.create` / `user.batch_create` 审计。
+
+批量表单的实现要点：
+- **逐行独立事务**——某行失败不影响其他行，结果按行报告（成功/跳过/失败 + 原因）
+- 密码留空回落到「默认初始密码」；支持中文逗号分隔（用户常从表格粘贴）
+- 第三列可选绑定选手，指定时校验该选手**未被他人绑定**（冲突则该行失败，不静默覆盖）
+- 以 `#` 开头的行视为注释
+
 ### 7.4 绑定流程（已实现）
 
 ```
@@ -145,11 +164,10 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 所有写操作落 `auditlog`（`xcpc_core/audit/api.py`，best-effort 跨库写，失败不回滚业务）：
 `player.create|update|delete`、`team.create|update|delete`、`contest.create|delete`、
-`import.confirm`、`binding.approve|reject`、`points.approve|reject`；
-（待建）`weights.apply`。
+`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`tier.create|update|delete`、`award.create|update|delete`、`user.create`、`user.batch_create`、`weights.apply`。
 `diff_json` 只存变化字段；`/admin/audit` 按 user/action/日期筛选。
 
-> 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD **未接审计**；OJ 账号编辑与角色变更也无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。
+> 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD 已接审计（`tier.*` / `award.*`，更新时留前后值）；OJ 账号编辑与角色变更仍无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。
 
 ## 8. Web 测试基建
 
@@ -170,7 +188,7 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 |----------------------|------------|
 | 榜单页 + 筛选/搜索/URL 分享、选手/比赛详情、登录注册绑定、全部 admin 页 | 队伍详情页（再议） |
 | 审计日志、recharts Rating 曲线 | 深色模式（当前为固定暗色主题） |
-| 权重试算（P6，待建） | OJ 数据在线导入 |
+| 权重试算（P6 ✅） | OJ 数据在线导入 |
 | 密码重置（CLI 已有；admin UI 待定） | 训练赛在线录入（随 P-U3） |
 
 开放问题（详见 08 路线图）：注册限制（邀请码/域名，公网前必须定）、密码找回 UI、上传文件大小上限（建议 10MB）、`retired` 绑定用户保留写权限 / `left` 自动解绑（建议状态）。

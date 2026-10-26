@@ -7,7 +7,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from xcpc_core.importer.models import FormalImportParams
+from xcpc_core.importer.models import ContestJsonDocument, FormalImportParams
+from xcpc_core.importer.contest_json import (
+    import_contest_json as _import_json,
+    preview_contest_json as _preview_json,
+)
 from xcpc_core.importer.staged import (
     confirm_import_batch as _confirm,
     discard_import_batch as _discard,
@@ -22,6 +26,38 @@ _default_session: Session | None = None
 def configure_session(session: Session | None) -> None:
     global _default_session
     _default_session = session
+
+
+def preview_contest_json(
+    document: ContestJsonDocument | dict[str, Any] | Path | str,
+    *,
+    repo_root: Path | None = None,
+    session: Session | None = None,
+):
+    """P-U3 只读预览：校验 + 姓名匹配，不写库不归档。"""
+    return _preview_json(
+        document, repo_root=repo_root, session=session or _default_session
+    )
+
+
+def import_contest_json(
+    document: ContestJsonDocument | dict[str, Any] | Path | str,
+    *,
+    auto_create_players: bool = True,
+    default_grade: int | None = None,
+    decisions: dict[str, dict[str, Any]] | None = None,
+    repo_root: Path | None = None,
+    session: Session | None = None,
+):
+    """P-U3 通用比赛 JSON 导入（Web/CLI 共用入口）。"""
+    return _import_json(
+        document,
+        auto_create_players=auto_create_players,
+        default_grade=default_grade,
+        decisions=decisions,
+        repo_root=repo_root,
+        session=session or _default_session,
+    )
 
 
 def stage_formal_xlsx(
