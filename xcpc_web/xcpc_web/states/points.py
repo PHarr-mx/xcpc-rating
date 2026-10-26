@@ -178,7 +178,7 @@ class PointsState(AuthState):
                 "points": f"{row.points:.1f}",
                 "entry_count": row.entry_count,
             }
-            for row in points_api.individual_leaderboard()
+            for row in points_api.individual_leaderboard(best_n=points_api.load_best_n())
         ]
 
     @rx.var(cache=False)
@@ -194,7 +194,7 @@ class PointsState(AuthState):
                 "composite": f"{row.composite:.1f}",
                 "members": "、".join(row.members),
             }
-            for row in points_api.team_leaderboard()
+            for row in points_api.team_leaderboard(best_n=points_api.load_best_n())
         ]
 
     # ---- 事件 ----

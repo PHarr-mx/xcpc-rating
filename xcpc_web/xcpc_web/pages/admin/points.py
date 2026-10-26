@@ -111,6 +111,49 @@ def _claims_table() -> rx.Component:
     )
 
 
+def _auto_record_card() -> rx.Component:
+    """P4 免认证直录：把系统内已有成绩批量记为 approved 积分。"""
+    return rx.card(
+        rx.vstack(
+            rx.heading("免认证直录", size="5"),
+            rx.text(
+                "适用于系统内已有权威成绩的场次（正式赛导入、通用 JSON 导入）。"
+                "系统按成绩表批量生成「已通过」的认证与积分流水，选手无需提交。"
+                "重复执行会先清除上次的直录记录再重建，选手手工提交的认证不受影响。",
+                size="2",
+                color_scheme="gray",
+            ),
+            rx.hstack(
+                rx.select(
+                    AdminPointsState.points_contests.map(lambda c: c["id"]),
+                    value=AdminPointsState.auto_contest_id,
+                    on_change=AdminPointsState.set_auto_contest_id,
+                    placeholder="选择计积分的比赛",
+                    width="22em",
+                ),
+                rx.checkbox(
+                    "覆盖上次直录结果",
+                    checked=AdminPointsState.auto_replace,
+                    on_change=AdminPointsState.set_auto_replace,
+                    size="2",
+                ),
+                rx.button(
+                    "批量直录",
+                    on_click=AdminPointsState.auto_record,
+                    color_scheme="green",
+                    variant="soft",
+                ),
+                spacing="3",
+                wrap="wrap",
+                align="center",
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
 def admin_points() -> rx.Component:
     """``/admin/points`` 积分认证管理页面。"""
     return page_shell(
@@ -130,6 +173,7 @@ def admin_points() -> rx.Component:
                     width="100%",
                 ),
                 _feedback(),
+                _auto_record_card(),
                 _claims_table(),
                 spacing="5",
                 width="100%",

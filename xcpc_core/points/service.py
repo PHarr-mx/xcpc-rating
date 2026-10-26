@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from xcpc_core.db.tables import (
@@ -22,6 +23,8 @@ from xcpc_core.db.tables import (
     Player,
     PointsClaim,
     PointsEntry,
+    Standing,
+    StandingMember,
     Team,
     TeamAlias,
     TeamMember,
@@ -43,6 +46,7 @@ from xcpc_core.points.models import (
     TeamPointsRow,
 )
 from xcpc_core.tier.store import TierStore
+from xcpc_core.utils.calendar import competition_year
 
 DEFAULT_W_TEAM = 0.6
 DEFAULT_W_MEMBER = 0.4
@@ -287,6 +291,175 @@ def _compute_claim_points(session: Session, contest: Contest, claim: PointsClaim
     return compute_award_points(base_points=base, coefficient=coefficient)
 
 
+def _write_entries(
+    session: Session,
+    *,
+    contest: Contest,
+    claim: PointsClaim,
+    points: float,
+    snapshot: str,
+    now: datetime,
+) -> None:
+    """按 entity 写双 owner 积分流水（个人 1 条 / 队伍 1 条 team + 每名队员 1 条）。
+
+    ``review_claim``（人工审批）与 ``auto_record_contest_points``（P4 免认证直录）
+    共用此函数，保证两条入口的流水结构与 team_context 口径完全一致。
+    """
+    def _entry(owner_type: str, owner_id: str, team_context: str | None) -> PointsEntry:
+        return PointsEntry(
+            owner_type=owner_type,
+            owner_id=owner_id,
+            points=points,
+            contest_id=contest.id,
+            claim_id=claim.id,
+            team_context=team_context,
+            payload_json=snapshot,
+            date=contest.date,
+            created_at=now,
+        )
+
+    if claim.entity == "player":
+        session.add(_entry("player", claim.player_id, None))
+        return
+    # 队伍赛三人共享：1 条 team 流水 + 每名现役成员 1 条 player 流水
+    session.add(_entry("team", claim.team_id, claim.team_id))
+    member_ids = session.scalars(
+        select(TeamMember.player_id).where(TeamMember.team_id == claim.team_id)
+    ).all()
+    for member_id in member_ids:
+        session.add(_entry("player", member_id, claim.team_id))
+
+
+def auto_record_contest_points(
+    session: Session | None,
+    *,
+    contest_id: str,
+    created_by: int,
+    replace: bool = True,
+) -> list[PointsClaimView]:
+    """P4 免认证直录：从 contest 的 standings 批量生成 approved 认证与积分流水。
+
+    适用「系统内已有权威成绩」的场次（正式赛导入、通用 JSON 导入），选手无需申报。
+    与人工认证的区别只在**起点**：直接以 approved 落地，其余（积分公式、双 owner
+    流水、参数快照）与 ``review_claim`` 完全共用 ``_write_entries`` / ``_compute_claim_points``。
+
+    ``replace=True`` 时先清掉本场已有的**非人工**流水（``submitted_by=created_by``
+    且该场 contest 的 claim 全部来自直录），再整批重建，保证重复调用幂等。
+    """
+    s, owned = _resolve_session(session)
+    try:
+        contest = s.get(Contest, contest_id)
+        if contest is None:
+            raise ClaimNotFoundError(f"比赛不存在: {contest_id}")
+        if not contest.counts_for_points:
+            raise InvalidClaimError(f"比赛 {contest_id} 未开启记积分（counts_for_points=False）")
+        if contest.scoring == "formula" and (contest.max_value is None or contest.n_teams is None):
+            raise InvalidClaimError(
+                "formula 场次直录需要 max_value 与 n_teams 配置，请先补全比赛信息"
+            )
+
+        standings = s.scalars(
+            select(Standing).where(Standing.contest_id == contest_id).order_by(Standing.rank)
+        ).all()
+        if not standings:
+            raise InvalidClaimError(f"比赛 {contest_id} 没有成绩行，无法直录积分")
+
+        now = _now()
+        if replace:
+            _clear_auto_entries(s, contest_id)
+
+        tier = TierStore(s).get(contest.tier_id) if contest.tier_id else None
+        coefficient = tier.coefficient if tier else 1.0
+        created: list[PointsClaim] = []
+
+        for row in standings:
+            target_player = row_team = None
+            if contest.entity == "player":
+                members = s.scalars(
+                    select(StandingMember.player_id).where(StandingMember.standing_id == row.id)
+                ).all()
+                if not members:
+                    continue
+                target_player = members[0]
+            else:
+                if not row.team_id:
+                    continue
+                row_team = row.team_id
+
+            claim = PointsClaim(
+                contest_id=contest.id,
+                entity=contest.entity,
+                player_id=target_player,
+                team_id=row_team,
+                value=row.solved if contest.format == "icpc" else row.score,
+                rank=row.rank,
+                award=row.award,
+                note="系统直录（免认证）",
+                status="approved",
+                submitted_by=created_by,
+                decided_by=created_by,
+                decided_at=now,
+                created_at=now,
+            )
+            s.add(claim)
+            s.flush()
+
+            points = _compute_claim_points(s, contest, claim)
+            snapshot = json.dumps(
+                {
+                    "scoring": contest.scoring,
+                    "value": claim.value,
+                    "rank": claim.rank,
+                    "award": claim.award,
+                    "max_value": contest.max_value,
+                    "n_teams": contest.n_teams,
+                    "tier": tier.name if tier else None,
+                    "coefficient": coefficient,
+                    "source": "auto",
+                },
+                ensure_ascii=False,
+            )
+            _write_entries(s, contest=contest, claim=claim, points=points, snapshot=snapshot, now=now)
+            created.append(claim)
+
+        s.add(
+            AuditLog(
+                action="points.auto_record",
+                target=contest.id,
+                user_id=created_by,
+                diff_json=json.dumps(
+                    {"contest_id": contest.id, "claims": len(created), "replaced": replace},
+                    ensure_ascii=False,
+                ),
+                at=now,
+            )
+        )
+        s.commit()
+        return [_claim_view(s, claim) for claim in created]
+    except Exception:
+        s.rollback()
+        raise
+    finally:
+        if owned:
+            s.close()
+
+
+def _clear_auto_entries(session: Session, contest_id: str) -> None:
+    """删除本场的直录流水与认证（仅限系统生成的 claim）。"""
+    auto_claims = session.scalars(
+        select(PointsClaim).where(
+            PointsClaim.contest_id == contest_id,
+            PointsClaim.note == "系统直录（免认证）",
+        )
+    ).all()
+    if not auto_claims:
+        return
+    claim_ids = [claim.id for claim in auto_claims]
+    session.execute(delete(PointsEntry).where(PointsEntry.claim_id.in_(claim_ids)))
+    session.execute(delete(PointsClaim).where(PointsClaim.id.in_(claim_ids)))
+    session.flush()
+
+
 def review_claim(
     session: Session | None,
     *,
@@ -387,12 +560,109 @@ def review_claim(
 # ---- 榜单 ------------------------------------------------------------------
 
 
+def _best_n_by_year(
+    session: Session,
+    *,
+    owner_type: str,
+    best_n: int | None,
+    team_context_filter: str | None = None,
+) -> dict[str, float]:
+    """P5 防刷上限：按**赛年**分组，每人/每队只取最好的 N 场（分值降序）。
+
+    UCup 降序哲学：配额择优，不是先到先得——所以先按 points 降序（同分按日期升序
+    稳定），再取前 N 条。``best_n=None`` 表示不设上限（返回全部相加，与旧行为一致）。
+
+    返回 ``{owner_id: 累加分}``；调用方决定是直接出榜还是进一步复合。
+    """
+    stmt = select(PointsEntry.owner_id, PointsEntry.date, PointsEntry.points).where(
+        PointsEntry.owner_type == owner_type
+    )
+    if team_context_filter is not None:
+        stmt = stmt.where(PointsEntry.team_context != team_context_filter)
+    buckets: dict[tuple[str, int], list[tuple[date, float]]] = {}
+    for owner_id, entry_date, points in session.execute(stmt).all():
+        key = (owner_id, competition_year(entry_date))
+        buckets.setdefault(key, []).append((entry_date, float(points)))
+
+    totals: dict[str, float] = {}
+    for (owner_id, _year), entries in buckets.items():
+        ranked = sorted(entries, key=lambda item: (-item[1], item[0]))
+        chosen = ranked if best_n is None else ranked[:best_n]
+        totals[owner_id] = totals.get(owner_id, 0.0) + sum(points for _, points in chosen)
+    return totals
+
+
+def load_best_n(*, repo_root: Path | None = None) -> int | None:
+    """读 ``data/config/points.yaml`` 的 ``best_n``（P5 防刷上限）。
+
+    缺文件或未配置 → ``None``（不设上限，保持历史行为）。配置示例::
+
+        best_n: 8    # 每个赛年最多计入 8 场
+    """
+    from xcpc_core.player.store import find_repo_root
+
+    root = repo_root or find_repo_root()
+    path = root / "data" / "config" / "points.yaml"
+    if not path.is_file():
+        return None
+    import yaml
+
+    with path.open(encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    value = data.get("best_n")
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{path} 的 best_n 必须是整数: {value!r}") from None
+    if parsed < 1:
+        raise ValueError(f"{path} 的 best_n 必须 ≥ 1: {parsed}")
+    return parsed
+
+
 def individual_leaderboard(
-    session: Session | None, *, start: date | None = None, end: date | None = None
+    session: Session | None,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    best_n: int | None = None,
 ) -> list[IndividualPointsRow]:
-    """个人积分榜：个人流水直加。离队（left）选手不出榜。"""
+    """个人积分榜：个人流水直加。离队（left）选手不出榜。
+
+    ``best_n`` 为 P5 防刷上限：按赛年每人只取最好的 N 场；``None`` 表示不设限
+    （默认，与历史行为一致）。
+    """
     s, owned = _resolve_session(session)
     try:
+        if best_n is not None:
+            totals = _best_n_by_year(s, owner_type="player", best_n=best_n)
+            counts: dict[str, int] = {}
+            for owner_id, count in s.execute(
+                select(PointsEntry.owner_id, func.count(PointsEntry.id))
+                .where(PointsEntry.owner_type == "player")
+                .group_by(PointsEntry.owner_id)
+            ).all():
+                counts[owner_id] = count
+            rows = []
+            for owner_id, total in totals.items():
+                player = s.get(Player, owner_id)
+                if player is None or player.status == "left":
+                    continue
+                rows.append(
+                    IndividualPointsRow(
+                        rank=0,
+                        player_id=owner_id,
+                        name=player.name,
+                        points=float(total),
+                        entry_count=counts.get(owner_id, 0),
+                    )
+                )
+            rows.sort(key=lambda r: (-r.points, r.player_id))
+            for idx, row in enumerate(rows, start=1):
+                row.rank = idx
+            return rows
+
         stmt = (
             select(
                 PointsEntry.owner_id,
@@ -430,11 +700,14 @@ def team_leaderboard(
     w_member: float = DEFAULT_W_MEMBER,
     start: date | None = None,
     end: date | None = None,
+    best_n: int | None = None,
 ) -> list[TeamPointsRow]:
     """队伍积分榜：复合分 = w_team×团队积分 + w_member×Σ(成员队外个人积分)。
 
     排除规则防双计：成员队外积分 = 成员全部个人流水 − team_context=本队的流水。
     成员取当前 roster（teammember），队名取最新别名。
+
+    ``best_n`` 为 P5 防刷上限：团队积分与成员队外积分**各自**按赛年择优取前 N 场。
     """
     s, owned = _resolve_session(session)
 
@@ -446,32 +719,38 @@ def team_leaderboard(
         return stmt
 
     try:
-        team_rows = s.execute(
-            _window(
-                select(PointsEntry.owner_id, func.sum(PointsEntry.points))
-                .where(PointsEntry.owner_type == "team")
-                .group_by(PointsEntry.owner_id)
-            )
-        ).all()
-        team_points = {owner_id: float(total) for owner_id, total in team_rows}
+        if best_n is not None:
+            team_points = _best_n_by_year(s, owner_type="team", best_n=best_n)
+            player_totals = _best_n_by_year(s, owner_type="player", best_n=best_n)
+        else:
+            team_rows = s.execute(
+                _window(
+                    select(PointsEntry.owner_id, func.sum(PointsEntry.points))
+                    .where(PointsEntry.owner_type == "team")
+                    .group_by(PointsEntry.owner_id)
+                )
+            ).all()
+            team_points = {owner_id: float(total) for owner_id, total in team_rows}
 
-        player_totals: dict[str, float] = {}
-        for owner_id, total in s.execute(
-            _window(
-                select(PointsEntry.owner_id, func.sum(PointsEntry.points))
-                .where(PointsEntry.owner_type == "player")
-                .group_by(PointsEntry.owner_id)
-            )
-        ).all():
-            player_totals[owner_id] = float(total)
+            player_totals = {}
+            for owner_id, total in s.execute(
+                _window(
+                    select(PointsEntry.owner_id, func.sum(PointsEntry.points))
+                    .where(PointsEntry.owner_type == "player")
+                    .group_by(PointsEntry.owner_id)
+                )
+            ).all():
+                player_totals[owner_id] = float(total)
 
         via_team: dict[tuple[str, str], float] = {}
+        via_stmt = select(
+            PointsEntry.team_context, PointsEntry.owner_id, func.sum(PointsEntry.points)
+        ).where(PointsEntry.owner_type == "player", PointsEntry.team_context.is_not(None))
+        if best_n is None:
+            via_stmt = _window(via_stmt)
+        # best_n 模式下按队排除的口径不变（只影响成员总分怎么算），排除量仍取全量
         for team_id, owner_id, total in s.execute(
-            _window(
-                select(PointsEntry.team_context, PointsEntry.owner_id, func.sum(PointsEntry.points))
-                .where(PointsEntry.owner_type == "player", PointsEntry.team_context.is_not(None))
-                .group_by(PointsEntry.team_context, PointsEntry.owner_id)
-            )
+            via_stmt.group_by(PointsEntry.team_context, PointsEntry.owner_id)
         ).all():
             via_team[(team_id, owner_id)] = float(total)
 

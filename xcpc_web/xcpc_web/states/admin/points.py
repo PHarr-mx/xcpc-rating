@@ -28,6 +28,51 @@ class AdminPointsState(AdminState):
         self.admin_feedback = ""
         return None
 
+    # ---- 直录（P4）表单 ----
+
+    auto_contest_id: str = ""
+    auto_replace: bool = True
+
+    def set_auto_contest_id(self, value: str) -> None:
+        self.auto_contest_id = value
+
+    def set_auto_replace(self, value: bool) -> None:
+        self.auto_replace = value
+
+    @rx.var(cache=False)
+    def points_contests(self) -> list[dict]:
+        """可直录的比赛：counts_for_points=True 且有成绩行。"""
+        if not self.is_admin:
+            return []
+        import xcpc_core.contest.api as contest_api
+
+        return [
+            {"id": c.id, "title": c.title, "date": c.date.isoformat()}
+            for c in contest_api.list_contests()
+            if getattr(c, "counts_for_points", False)
+        ]
+
+    def auto_record(self):
+        """P4：从 standings 批量生成 approved 认证与流水（选手免提交）。"""
+        if ret := self._require_admin():
+            return ret
+        self.admin_error = ""
+        self.admin_feedback = ""
+        if not self.auto_contest_id:
+            self.admin_error = "请先选择要直录的比赛"
+            return None
+        try:
+            created = points_api.auto_record_contest_points(
+                contest_id=self.auto_contest_id,
+                created_by=self.authenticated_user.id,
+                replace=self.auto_replace,
+            )
+        except Exception as exc:
+            self.admin_error = str(exc)
+            return None
+        self.admin_feedback = f"已直录 {len(created)} 条认证记录（比赛 {self.auto_contest_id}）"
+        return None
+
     # ---- 展示 var ----
 
     @rx.var(cache=False)
