@@ -131,6 +131,98 @@ def _users_table() -> rx.Component:
     )
 
 
+def _batch_create() -> rx.Component:
+    """批量建号（五期：不允许自助注册，账号由管理员统一创建）。"""
+    return rx.card(
+        rx.vstack(
+            rx.heading("批量创建账号", size="5"),
+            rx.text(
+                "系统不开放自助注册。每行一个账号，格式：用户名[,初始密码][,绑定选手ID]。"
+                "密码留空则用下方默认初始密码；绑定选手可选（须未被他人绑定）。"
+                "以 # 开头的行会被忽略。逐行独立处理——某行失败不影响其他行。",
+                size="2",
+                color_scheme="gray",
+            ),
+            rx.text_area(
+                value=AdminUsersState.batch_text,
+                on_change=AdminUsersState.set_batch_text,
+                placeholder=(
+                    "zhangsan,Passw0rd,p001\n"
+                    "lisi                    # 用默认密码\n"
+                    "wangwu,Passw0rd"
+                ),
+                rows="7",
+                width="100%",
+                font_family="monospace",
+            ),
+            rx.hstack(
+                rx.input(
+                    value=AdminUsersState.batch_default_password,
+                    on_change=AdminUsersState.set_batch_default_password,
+                    placeholder="默认初始密码（≥6 位，未逐行指定时使用）",
+                    type="password",
+                    width="24em",
+                ),
+                rx.button(
+                    "批量创建",
+                    on_click=AdminUsersState.submit_batch,
+                    color_scheme="green",
+                ),
+                rx.button(
+                    "清空",
+                    on_click=AdminUsersState.clear_batch,
+                    variant="ghost",
+                ),
+                spacing="3",
+                wrap="wrap",
+                align="center",
+            ),
+            rx.cond(
+                AdminUsersState.batch_rows.length() > 0,
+                rx.vstack(
+                    rx.separator(size="4"),
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("输入行"),
+                                rx.table.column_header_cell("用户名"),
+                                rx.table.column_header_cell("结果", width="80px"),
+                                rx.table.column_header_cell("说明"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(
+                                AdminUsersState.batch_rows,
+                                lambda row: rx.table.row(
+                                    rx.table.cell(
+                                        rx.code(row["line"]), size="1"
+                                    ),
+                                    rx.table.cell(row["username"]),
+                                    rx.table.cell(
+                                        rx.badge(
+                                            row["label"],
+                                            color_scheme=row["tone"],
+                                            variant="soft",
+                                        )
+                                    ),
+                                    rx.table.cell(row["message"], size="1"),
+                                ),
+                            )
+                        ),
+                        width="100%",
+                    ),
+                    spacing="2",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
 def admin_users() -> rx.Component:
     """/admin/users 用户与绑定审批页。"""
     return page_shell(
@@ -140,10 +232,11 @@ def admin_users() -> rx.Component:
                 rx.heading("用户与绑定审批", size="7"),
                 _feedback(),
                 _pending_table(),
+                _batch_create(),
                 _users_table(),
                 spacing="6",
                 width="100%",
-                max_width="60em",
+                max_width="80em",
             ),
             rx.text("无权访问，请以管理员身份登录。", size="3", color_scheme="gray"),
         ), section="admin", subsection="users")

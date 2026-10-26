@@ -47,11 +47,10 @@ def login() -> rx.Component:
                             ),
                             rx.button("登录", width="100%"),
                             rx.center(
-                                rx.link(
-                                    "还没有账号？去注册",
-                                    on_click=rx.redirect(
-                                        reflex_local_auth.routes.REGISTER_ROUTE
-                                    ),
+                                rx.text(
+                                    "账号由管理员统一创建，如需开通请联系赛事负责人。",
+                                    size="1",
+                                    color_scheme="gray",
                                 ),
                                 width="100%",
                             ),

@@ -34,10 +34,11 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 |------|------|------|------|
 | `/` | 榜单（默认 all + career；筛选同步 URL query） | guest | ✅ |
 | `/about` | 数据与赛季说明（静态） | guest | ✅ |
-| `/login` `/register` | 认证 | guest | ✅ |
+| `/login` | 登录 | guest | ✅ |
+| `/register` | **建号（admin-only）**：五期关闭自助注册后改为管理员单人建号；非管理员只看到说明 | admin | ✅ 2026-10-26 |
 | `/profile` | 我的资料、OJ 账号、绑定状态 | member | ✅ |
 | `/admin` | 概览 + 待审批计数 | admin | ✅ |
-| `/admin/users` | 用户与绑定审批 | admin | ✅ |
+| `/admin/users` | 用户与绑定审批 + **批量建号** | admin | ✅ 2026-10-26（批量建号） |
 | `/admin/players` | 选手 CRUD | admin | ✅ |
 | `/admin/teams` | 队伍 CRUD | admin | ✅ |
 | `/admin/contests` | 统一比赛管理：创建表单（赛制/形式/等级/双开关/计分方式）+ 列表与删除（P-U1） | admin | ✅ |
@@ -130,6 +131,24 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 结论：真正的防护只有**事件处理器 + computed var**两处；`on_load`/`require_login` 是体验层。三处都要写，但作用要分清。`bound_player_id` 是 computed var 每次从会话推导，**不缓存在可写 state var**——否则客户端可借 setter 覆盖它改别人的选手。
 
+### 7.3b 建号（不开放自助注册）
+
+五期定案（2026-10-26）：**不允许个人注册**，账号一律由管理员创建。两条入口：
+
+| 入口 | 场景 | 特点 |
+|------|------|------|
+| `/register`（admin-only） | 零星建 1–2 个 | 原注册页改造；非 admin 只看到「仅限管理员」说明，无表单 |
+| `/admin/users` 批量表单 | 首批开通、整届成员 | 每行 `用户名[,初始密码][,绑定选手ID]`，逐行独立事务 + 逐行结果 |
+
+两条入口都：服务端事件处理器内校验 admin（`rx.cond` 隐藏不是安全边界）、
+新账号默认 `member` 角色、写 `user.create` / `user.batch_create` 审计。
+
+批量表单的实现要点：
+- **逐行独立事务**——某行失败不影响其他行，结果按行报告（成功/跳过/失败 + 原因）
+- 密码留空回落到「默认初始密码」；支持中文逗号分隔（用户常从表格粘贴）
+- 第三列可选绑定选手，指定时校验该选手**未被他人绑定**（冲突则该行失败，不静默覆盖）
+- 以 `#` 开头的行视为注释
+
 ### 7.4 绑定流程（已实现）
 
 ```
@@ -145,7 +164,7 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 所有写操作落 `auditlog`（`xcpc_core/audit/api.py`，best-effort 跨库写，失败不回滚业务）：
 `player.create|update|delete`、`team.create|update|delete`、`contest.create|delete`、
-`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`tier.create|update|delete`、`award.create|update|delete`、`weights.apply`。
+`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`tier.create|update|delete`、`award.create|update|delete`、`user.create`、`user.batch_create`、`weights.apply`。
 `diff_json` 只存变化字段；`/admin/audit` 按 user/action/日期筛选。
 
 > 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD 已接审计（`tier.*` / `award.*`，更新时留前后值）；OJ 账号编辑与角色变更仍无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。

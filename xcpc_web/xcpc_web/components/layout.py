@@ -98,12 +98,6 @@ def _top_nav(active_section: str) -> rx.Component:
                         variant="soft",
                         size="2",
                     ),
-                    rx.button(
-                        "注册",
-                        on_click=rx.redirect(reflex_local_auth.routes.REGISTER_ROUTE),
-                        variant="solid",
-                        size="2",
-                    ),
                     spacing="2",
                 ),
             ),
