@@ -1,4 +1,4 @@
-"""points 业务逻辑（改挂统一 contest，CONTEST_UNIFICATION_PLAN §4.2/§2.6）。
+"""points 业务逻辑（改挂统一 contest，wiki/Rating与积分 §10/§2.6）。
 
 会话注入模式与 importer.staged 一致：函数接收 ``Session | None``，未注入时
 走默认工厂并负责关闭；写函数单事务 commit，异常回滚。审核通过在同一事务内

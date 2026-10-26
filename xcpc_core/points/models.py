@@ -1,4 +1,4 @@
-"""points DTO（改挂统一 contest，CONTEST_UNIFICATION_PLAN §2.5/§2.6）。"""
+"""points DTO（改挂统一 contest，wiki/Rating与积分 §11/§2.6）。"""
 
 from __future__ import annotations
 

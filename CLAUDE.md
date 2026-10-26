@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 技术栈：Python 3.13、pydantic v2、openpyxl、PyYAML、SQLAlchemy 2.0。原始数据以 JSON 存于 `data/raw/`（逐字可 diff、可进 Git，import 后写回归档），运行时数据在 SQLite（`data/db/xcpc.db` 业务 + `data/db/xcpc_web.db` 认证）。
 
-> Reflex + SQLite 方案已采纳并落地。里程碑：一期（地基）、二期（认证）、三期（管理后台）已完成；四期（业务补齐）进行中——AtCoder 式公式定案 + 重放引擎、积分制 v1、比赛统一化 P-U1/P-U2 已落地，**通用 JSON 导入（P-U3）与权重试算页（P6）未开始**；五期（部署上线）未开始。**当前进度与剩余工作以 [docs/08-路线图.md](docs/08-路线图.md) 为准。**
+> Reflex + SQLite 方案已落地。**功能开发已完成**（四期收官）；剩部署上线（五期）与 OJ 数据源（未立项）。**文档在 [wiki/](wiki/)，入口 [wiki/Home.md](wiki/Home.md)**；同步发布到 [GitHub Wiki](https://github.com/PHarr-mx/xcpc-rating/wiki)。
 
 ## 常用命令
 
@@ -65,7 +65,7 @@ cd xcpc_web && ../.venv/bin/reflex run # 启动开发服务器（端口 3000）
 cd xcpc_web && ../.venv/bin/python -m pytest tests -v   # web 测试单独跑
 ```
 
-详见 [docs/05-Web与认证.md](docs/05-Web与认证.md)。
+详见 [wiki/Web与权限.md](wiki/Web与权限.md)。
 
 ## 架构总览
 
@@ -129,11 +129,10 @@ data/raw/（人工投放 + import 写回归档，可 diff、可进 Git）
 
 ## 文档与实现状态
 
-- `docs/`（v2，2026-09-11 重构）共 9 篇，入口为 [docs/README.md](docs/README.md)：
-  - **参考**（描述已实现系统，含代码路径）：`01-架构与数据流`、`02-选手与队伍`、`03-比赛与导入`（formal 部分）、`04-Rating与榜单`（重放引擎与榜单部分）、`05-Web与认证`（已上线部分）
-  - **混合**（部分已实现、部分待建）：`03`（训练赛/OJ 待建）、`04`（OJ 归一化待建）、`05`（P6 权重试算待建）、`06-部署与运维`（五期，全部待建）
-  - **指南/计划**：`07-开发流程`（含避坑清单）、`08-路线图`（进度与剩余工作权威来源）
-- **已实现**：SQLite 持久化（20 张表，alembic 管）、选手/队伍 CRUD、正式赛导入全链路、**比赛统一化 P-U1+P-U2**（tier/awardlevel + contest 改造 + points 改挂 + 统一管理页；榜单/选手历史走 AtCoder 重放，`meta.rating_algorithm=atcoder_v1`）、积分制 v1、Reflex 全部已上线页面、认证与三层权限守卫。
-- **未实现**：通用 JSON 导入（P-U3）、OJ 数据源（三表零代码）、权重试算页、部署上线。进度权威见 [docs/08-路线图.md](docs/08-路线图.md) 与 CONTEST_UNIFICATION_PLAN.md。
-- 原 Vue 静态站方案、v1 版 docs（DESIGN + 01–14）已删除（留 Git 历史）。
-- `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流与避坑见 `docs/07-开发流程.md`。
+- 文档在 [wiki/](wiki/)，入口 [wiki/Home.md](wiki/Home.md)（同步发布到 GitHub Wiki）。按主题组织，**不再保留进度追踪/路线图类文档**（2026-10-26 重构，历史见 Git）：
+  - 技术文档：`架构与数据模型`、`比赛与导入`、`Rating与积分`、`Web与权限`、`开发指南`、`部署运维`
+  - 使用手册：`启动指南`、`普通用户操作手册`、`管理员操作手册`
+- **已实现**：SQLite 持久化（20 张表，alembic 管到 `0004`）、选手/队伍 CRUD、统一比赛模型（tier/awardlevel + 双开关）、正式赛 xlsx 导入（五步 staged）、通用比赛 JSON 导入、认证与绑定审批、账号由管理员创建（单人 + 批量）、管理后台 10 页、榜单（AtCoder 式重放 `atcoder_v1`）、选手/比赛详情、生涯积分制（含免认证直录）、权重试算页、三层权限守卫。
+- **未实现**：部署上线（Caddyfile / systemd / 备份 cron / 生产 rxconfig 均未创建）、OJ 数据源（三表已建、零读写代码、方案未定）。
+- 原 Vue 静态站方案、v1 版 docs（DESIGN + 01–14）、docs/ v2 九篇、根目录计划稿（PROGRESS / CONTEXT / RATING_FORMULA_PLAN / CONTEST_UNIFICATION_PLAN）均已删除（留 Git 历史）。
+- `skill/` 目录为 AI Agent Skills（`SKILL.md`），其中的工作流对 Claude 同样适用：`formal-import`、`player-manage`、`team-manage`。开发工作流与避坑见 [wiki/开发指南.md](wiki/开发指南.md)。

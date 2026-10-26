@@ -2,83 +2,80 @@
 
 校内 XCPC 系列编程竞赛的 Rating 统计与展示系统。
 
-> **技术路线（已采纳）**：Reflex（Python 全栈 Web）+ SQLite + Caddy 反向代理。
-> 原 Vue 3 静态站方案已废弃。进度与剩余工作见 [docs/08-路线图.md](docs/08-路线图.md)。
+> **技术路线**：Reflex（Python 全栈 Web）+ SQLite + Caddy 反向代理。
 
 ## 目录
 
 | 目录 | 说明 |
 |------|------|
 | [xcpc_core/](xcpc_core/) | Python 业务层（`player` / `team` / `contest` / `tier` / `importer` / `rating` / `points` / `board` / `db` / `utils`） |
-| [data/](data/) | 数据文件（raw / config / db） |
-| [docs/](docs/) | 设计文档、模块说明、开发手册 |
-| [skill/](skill/) | AI Agent Skills |
 | [xcpc_web/](xcpc_web/) | Reflex Web 前端 |
+| [data/](data/) | 数据文件（raw / config / db） |
+| [wiki/](wiki/) | **项目文档**（技术文档 + 使用手册） |
+| [skill/](skill/) | AI Agent Skills |
 
 ## 文档
 
-入口：[docs/README.md](docs/README.md)（文档地图 + 模块实现状态总览）。
+文档在 [`wiki/`](wiki/)，同步发布到 [GitHub Wiki](https://github.com/PHarr-mx/xcpc-rating/wiki)。
+
+**技术文档**（面向二期开发与运维）
 
 | 文档 | 说明 |
 |------|------|
-| [docs/01-架构与数据流.md](docs/01-架构与数据流.md) | 架构、分层规则、SQLite 表与并发运维、配置文件 |
-| [docs/02-选手与队伍.md](docs/02-选手与队伍.md) | Player / Team 模型、状态机、API 与 CLI |
-| [docs/03-比赛与导入.md](docs/03-比赛与导入.md) | 统一比赛模型；正式赛导入全链路；通用 JSON / OJ 待建 |
-| [docs/04-Rating与榜单.md](docs/04-Rating与榜单.md) | 事件模型、AtCoder 式重放引擎（atcoder_v1）、榜单与缓存 |
-| [docs/05-Web与认证.md](docs/05-Web与认证.md) | Reflex 分层、路由与页面、认证与权限、Web 测试基建 |
-| [docs/06-部署与运维.md](docs/06-部署与运维.md) | Caddy / systemd / 备份（五期待建） |
-| [docs/07-开发流程.md](docs/07-开发流程.md) | 开发手册：环境、约定、避坑、Agent 协作 |
-| [docs/08-路线图.md](docs/08-路线图.md) | 里程碑状态、剩余工作、待定决策 |
+| [架构与数据模型](wiki/架构与数据模型.md) | 分层规则、包结构、SQLite 双库与 20 张表、并发与备份、配置、选手/队伍模型 |
+| [比赛与导入](wiki/比赛与导入.md) | 统一比赛模型、xlsx 五步导入、通用 JSON 导入、事件生成 |
+| [Rating与积分](wiki/Rating与积分.md) | AtCoder 式重放引擎（公式与参数）、榜单与缓存、生涯积分制 |
+| [Web与权限](wiki/Web与权限.md) | 路由表、State 划分、认证与三层权限守卫、建号、审计、测试基建 |
+| [开发指南](wiki/开发指南.md) | 环境、编码约定、常用任务、**避坑清单**、Agent 协作 |
+| [部署运维](wiki/部署运维.md) | 生产构建、rxconfig、Caddy、systemd、备份、上线检查单 |
+
+**使用手册**
+
+| 手册 | 适用对象 |
+|------|----------|
+| [启动指南](wiki/启动指南.md) | 首次把系统跑起来 |
+| [普通用户操作手册](wiki/普通用户操作手册.md) | 访客与 member |
+| [管理员操作手册](wiki/管理员操作手册.md) | admin |
 
 ## 环境
 
 ```bash
-source ./setup_env.sh   # uv sync + 激活 .venv
+source ./setup_env.sh          # uv sync + 激活 .venv
+uv sync --extra web            # 追加 Web 依赖
 ```
 
-依赖与 Python 版本由 `pyproject.toml`（+ `.python-version` = 3.13）统一管理：
-
-```bash
-uv python install 3.13
-uv sync
-uv run python -m pytest xcpc_core -v
-```
+依赖与 Python 版本由 `pyproject.toml`（+ `.python-version` = 3.13）统一管理。
 
 ## 常用命令
 
 ```bash
-# 选手管理
+# 测试（两套分开跑）
+uv run python -m pytest xcpc_core -v
+cd xcpc_web && ../.venv/bin/python -m pytest tests -v
+
+# 选手 / 队伍
 python -m xcpc_core.player.cli list --visible-only
 python -m xcpc_core.player.cli get p001 --json
-
-# 队伍管理
 python -m xcpc_core.team.cli list
 python -m xcpc_core.team.cli find --members p001 p002
 
-# 正式赛导入（Python API）
-python -c "
-from xcpc_core.importer import FormalImportParams, import_formal_xcpcio_xlsx
-from xcpc_core.importer.config import load_school_organizations
-from datetime import date
-result = import_formal_xcpcio_xlsx('比赛.xlsx', FormalImportParams(
-    contest_id='2026_xxx', date=date(2026,5,18),
-    contest_type='icpc_provincial',
-    school_organizations=load_school_organizations(),
-))
-"
+# 通用比赛 JSON 导入
+python -m xcpc_core.importer.cli template --entity team
+python -m xcpc_core.importer.cli import x.json --dry-run
 
-# 运行测试
-uv run python -m pytest xcpc_core -v
+# 一次性灌数据（幂等）
+uv run python -m xcpc_core.db.migrate
 
 # Web 开发
-uv sync --extra web
 cd xcpc_web && ../.venv/bin/reflex run
 ```
 
-## 实施状态
+正式赛 xlsx 导入用 Web `/admin/import`，或 Python API `importer.import_formal_xcpcio_xlsx`。
 
-已完成：选手/队伍 CRUD、正式赛导入（CLI + Web 五步 staged）、认证与绑定审批、管理后台 9 页、统一比赛模型（tier/awardlevel）、生涯积分制 v1、选手/比赛详情页、榜单页（AtCoder 式重放引擎，`atcoder_v1`）。
+## 当前状态
 
-待建：通用 JSON 导入（P-U3，训练赛录入）、权重试算页（P6）、OJ 数据源（三表零代码）、部署上线（五期）。
+**功能开发已完成**：选手/队伍 CRUD、统一比赛模型（tier/awardlevel）、正式赛 xlsx 导入（五步 staged）、通用比赛 JSON 导入、认证与绑定审批、账号由管理员创建（单人 + 批量）、管理后台 10 页、榜单页（AtCoder 式重放，`atcoder_v1`）、选手/比赛详情页、生涯积分制、权重试算页。
 
-剩余工作与待定决策见 [docs/08-路线图.md](docs/08-路线图.md)；开发指引见 [docs/07-开发流程.md](docs/07-开发流程.md)。
+**未做**：部署上线（五期，配置产物尚未创建）、OJ 数据源（三表已建、方案未定）。
+
+部署方案见 [部署运维](wiki/部署运维.md)；开发约定与避坑见 [开发指南](wiki/开发指南.md)。

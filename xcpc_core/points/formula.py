@@ -1,4 +1,4 @@
-"""积分公式（UCup 式单场分，去 GP30；CONTEST_UNIFICATION_PLAN §2.6）。
+"""积分公式（UCup 式单场分，去 GP30；wiki/Rating与积分 §9）。
 
     formula:     R = 100 × (value / max_value) × ((n_teams − rank + 1) / n_teams) × 系数
     award_only:  R = awardlevel.base_points × 系数

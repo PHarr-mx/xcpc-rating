@@ -1,6 +1,6 @@
 """从统一 Contest/Standing 表生成 RatingEvent（归一化，docs/04 §5.3 的派生步骤）。
 
-数据源 = counts_for_ranking=True 的比赛（CONTEST_UNIFICATION_PLAN §3：逐场开关取代
+数据源 = counts_for_ranking=True 的比赛（wiki/比赛与导入 §6：逐场开关取代
 旧「仅训练赛」体系隔离）。名次口径：入库 standing 保留全省/全场原始名次，事件
 生成时做**内部重排名**（按原始名次排序 → 1,2,3…，并列取平均）——原始名次直接
 喂 Perf 方程会无解（r−0.5 可能超过入库实体数），重排名是数学上必须的一步。

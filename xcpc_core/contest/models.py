@@ -1,4 +1,4 @@
-"""统一比赛 DTO（CONTEST_UNIFICATION_PLAN §2.3）。
+"""统一比赛 DTO（wiki/比赛与导入 §1）。
 
 赛制（icpc|ioi）× 参与形式（player|team）× 赛事等级（tier_id）三维决定一场比赛；
 双开关 counts_for_points / counts_for_ranking 决定进积分流水 / Rating 重放。

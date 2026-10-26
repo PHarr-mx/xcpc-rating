@@ -86,7 +86,7 @@ class TeamAlias(Base):
 
 
 class Tier(Base):
-    """赛事等级（管理员前端 CRUD）：决定积分系数与排名权重（CONTEST_UNIFICATION_PLAN §2.1）。"""
+    """赛事等级（管理员前端 CRUD）：决定积分系数与排名权重（wiki/比赛与导入 §1）。"""
 
     __tablename__ = "tier"
 
@@ -108,7 +108,7 @@ class AwardLevel(Base):
 
 
 class Contest(Base):
-    """统一比赛（CONTEST_UNIFICATION_PLAN §2.3）：赛制 icpc|ioi × 形式 player|team × 等级 tier。
+    """统一比赛（wiki/比赛与导入 §1）：赛制 icpc|ioi × 形式 player|team × 等级 tier。
 
     逐场双开关 counts_for_points / counts_for_ranking 决定进积分流水 / Rating 重放；
     scoring=award_only 的场次（未公开完整排名）强制不进排名，积分由奖项基线 × 系数决定。
@@ -257,7 +257,7 @@ class ImportBatch(Base):
 class PointsClaim(Base):
     """积分认证：staged → approved/rejected（与 ImportBatch/BindingRequest 同型）。
 
-    认证改挂统一 contest（CONTEST_UNIFICATION_PLAN §2.5）：formula 场次填 value/rank，
+    认证改挂统一 contest（wiki/Rating与积分 §11）：formula 场次填 value/rank，
     award_only 场次填 award（须在 awardlevel 内），value/rank 置空。
     唯一性（部分唯一索引，见迁移）：个人赛 (contest, player)、队伍赛 (contest, team)
     各只允许一条非 rejected 记录，service 层同时前置校验。

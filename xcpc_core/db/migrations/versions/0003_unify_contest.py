@@ -4,7 +4,7 @@ Revision ID: 0003_unify_contest
 Revises: bb6e383f49c0
 Create Date: 2026-09-30
 
-比赛统一化改造（CONTEST_UNIFICATION_PLAN §2）：
+比赛统一化改造（wiki/比赛与导入 §1）：
 
 1. 新建 ``tier``（赛事等级，积分/排名系数）与 ``awardlevel``（奖项基线分），
    并按 contest_weights.yaml 播种初始等级（系数 = weight/100）+ 兜底「未分级」；

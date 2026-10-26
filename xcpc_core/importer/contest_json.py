@@ -1,4 +1,4 @@
-"""P-U3 通用比赛 JSON 导入（CONTEST_UNIFICATION_PLAN §7）。
+"""P-U3 通用比赛 JSON 导入（wiki/比赛与导入 §3）。
 
 与正式赛 xlsx 导入的关系：
 - **复用**：姓名解析（``resolve_member_names``，含同名歧义与自动建档）、

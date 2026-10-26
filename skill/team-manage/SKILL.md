@@ -13,7 +13,7 @@ description: >-
 1. 激活环境：`source ./setup_env.sh`（项目根目录）
 2. 数据存储：SQLite `data/db/xcpc.db`（`data/raw/teams/roster.json` 仅为一次性迁移源）
 
-CRUD 模块分层与迁移约定见 [docs/07-开发流程.md](../../docs/07-开发流程.md) §2。
+CRUD 模块分层与迁移约定见 [开发指南](../../wiki/开发指南.md) §2。
 
 ## 原则
 
