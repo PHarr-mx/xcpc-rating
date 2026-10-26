@@ -202,7 +202,7 @@ def isolate_repo_root(tmp_path, monkeypatch):
 
     real_root = find_repo_root()
     (tmp_path / "data/config").mkdir(parents=True, exist_ok=True)
-    for name in ("contest_weights.yaml", "school.yaml", "points.yaml"):
+    for name in ("contest_weights.yaml", "school.yaml"):
         source = real_root / "data" / "config" / name
         if source.is_file():
             shutil.copy(source, tmp_path / "data" / "config" / name)

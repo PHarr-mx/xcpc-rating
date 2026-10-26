@@ -71,11 +71,6 @@ def review_claim(
     return service.review_claim(_session(session), claim_id=claim_id, decision=decision, decided_by=decided_by)
 
 
-def load_best_n(*, repo_root=None) -> int | None:
-    """读 P5 防刷上限配置（data/config/points.yaml 的 best_n）；未配置返回 None。"""
-    return service.load_best_n(repo_root=repo_root)
-
-
 def auto_record_contest_points(
     *,
     contest_id: str,
@@ -93,10 +88,9 @@ def individual_leaderboard(
     *,
     start: date | None = None,
     end: date | None = None,
-    best_n: int | None = None,
     session: Session | None = None,
 ) -> list[IndividualPointsRow]:
-    return service.individual_leaderboard(_session(session), start=start, end=end, best_n=best_n)
+    return service.individual_leaderboard(_session(session), start=start, end=end)
 
 
 def team_leaderboard(
@@ -105,9 +99,6 @@ def team_leaderboard(
     w_member: float = service.DEFAULT_W_MEMBER,
     start: date | None = None,
     end: date | None = None,
-    best_n: int | None = None,
     session: Session | None = None,
 ) -> list[TeamPointsRow]:
-    return service.team_leaderboard(
-        _session(session), w_team=w_team, w_member=w_member, start=start, end=end, best_n=best_n
-    )
+    return service.team_leaderboard(_session(session), w_team=w_team, w_member=w_member, start=start, end=end)

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timezone
-from pathlib import Path
 from typing import Literal
 
 from sqlalchemy import delete, func, select
@@ -46,7 +45,6 @@ from xcpc_core.points.models import (
     TeamPointsRow,
 )
 from xcpc_core.tier.store import TierStore
-from xcpc_core.utils.calendar import competition_year
 
 DEFAULT_W_TEAM = 0.6
 DEFAULT_W_MEMBER = 0.4
@@ -560,109 +558,16 @@ def review_claim(
 # ---- 榜单 ------------------------------------------------------------------
 
 
-def _best_n_by_year(
-    session: Session,
-    *,
-    owner_type: str,
-    best_n: int | None,
-    team_context_filter: str | None = None,
-) -> dict[str, float]:
-    """P5 防刷上限：按**赛年**分组，每人/每队只取最好的 N 场（分值降序）。
-
-    UCup 降序哲学：配额择优，不是先到先得——所以先按 points 降序（同分按日期升序
-    稳定），再取前 N 条。``best_n=None`` 表示不设上限（返回全部相加，与旧行为一致）。
-
-    返回 ``{owner_id: 累加分}``；调用方决定是直接出榜还是进一步复合。
-    """
-    stmt = select(PointsEntry.owner_id, PointsEntry.date, PointsEntry.points).where(
-        PointsEntry.owner_type == owner_type
-    )
-    if team_context_filter is not None:
-        stmt = stmt.where(PointsEntry.team_context != team_context_filter)
-    buckets: dict[tuple[str, int], list[tuple[date, float]]] = {}
-    for owner_id, entry_date, points in session.execute(stmt).all():
-        key = (owner_id, competition_year(entry_date))
-        buckets.setdefault(key, []).append((entry_date, float(points)))
-
-    totals: dict[str, float] = {}
-    for (owner_id, _year), entries in buckets.items():
-        ranked = sorted(entries, key=lambda item: (-item[1], item[0]))
-        chosen = ranked if best_n is None else ranked[:best_n]
-        totals[owner_id] = totals.get(owner_id, 0.0) + sum(points for _, points in chosen)
-    return totals
-
-
-def load_best_n(*, repo_root: Path | None = None) -> int | None:
-    """读 ``data/config/points.yaml`` 的 ``best_n``（P5 防刷上限）。
-
-    缺文件或未配置 → ``None``（不设上限，保持历史行为）。配置示例::
-
-        best_n: 8    # 每个赛年最多计入 8 场
-    """
-    from xcpc_core.player.store import find_repo_root
-
-    root = repo_root or find_repo_root()
-    path = root / "data" / "config" / "points.yaml"
-    if not path.is_file():
-        return None
-    import yaml
-
-    with path.open(encoding="utf-8") as file:
-        data = yaml.safe_load(file) or {}
-    value = data.get("best_n")
-    if value is None:
-        return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"{path} 的 best_n 必须是整数: {value!r}") from None
-    if parsed < 1:
-        raise ValueError(f"{path} 的 best_n 必须 ≥ 1: {parsed}")
-    return parsed
-
-
 def individual_leaderboard(
-    session: Session | None,
-    *,
-    start: date | None = None,
-    end: date | None = None,
-    best_n: int | None = None,
+    session: Session | None, *, start: date | None = None, end: date | None = None
 ) -> list[IndividualPointsRow]:
     """个人积分榜：个人流水直加。离队（left）选手不出榜。
 
-    ``best_n`` 为 P5 防刷上限：按赛年每人只取最好的 N 场；``None`` 表示不设限
-    （默认，与历史行为一致）。
+    不设场次上限（2026-10-26 决策）：多参赛本身是投入度的体现，积分制正是要
+    奖励这种投入，用「最好 N 场」压制它会与设计意图冲突。
     """
     s, owned = _resolve_session(session)
     try:
-        if best_n is not None:
-            totals = _best_n_by_year(s, owner_type="player", best_n=best_n)
-            counts: dict[str, int] = {}
-            for owner_id, count in s.execute(
-                select(PointsEntry.owner_id, func.count(PointsEntry.id))
-                .where(PointsEntry.owner_type == "player")
-                .group_by(PointsEntry.owner_id)
-            ).all():
-                counts[owner_id] = count
-            rows = []
-            for owner_id, total in totals.items():
-                player = s.get(Player, owner_id)
-                if player is None or player.status == "left":
-                    continue
-                rows.append(
-                    IndividualPointsRow(
-                        rank=0,
-                        player_id=owner_id,
-                        name=player.name,
-                        points=float(total),
-                        entry_count=counts.get(owner_id, 0),
-                    )
-                )
-            rows.sort(key=lambda r: (-r.points, r.player_id))
-            for idx, row in enumerate(rows, start=1):
-                row.rank = idx
-            return rows
-
         stmt = (
             select(
                 PointsEntry.owner_id,
@@ -700,14 +605,11 @@ def team_leaderboard(
     w_member: float = DEFAULT_W_MEMBER,
     start: date | None = None,
     end: date | None = None,
-    best_n: int | None = None,
 ) -> list[TeamPointsRow]:
     """队伍积分榜：复合分 = w_team×团队积分 + w_member×Σ(成员队外个人积分)。
 
     排除规则防双计：成员队外积分 = 成员全部个人流水 − team_context=本队的流水。
-    成员取当前 roster（teammember），队名取最新别名。
-
-    ``best_n`` 为 P5 防刷上限：团队积分与成员队外积分**各自**按赛年择优取前 N 场。
+    成员取当前 roster（teammember），队名取最新别名。不设场次上限（同个人榜）。
     """
     s, owned = _resolve_session(session)
 
@@ -719,38 +621,32 @@ def team_leaderboard(
         return stmt
 
     try:
-        if best_n is not None:
-            team_points = _best_n_by_year(s, owner_type="team", best_n=best_n)
-            player_totals = _best_n_by_year(s, owner_type="player", best_n=best_n)
-        else:
-            team_rows = s.execute(
-                _window(
-                    select(PointsEntry.owner_id, func.sum(PointsEntry.points))
-                    .where(PointsEntry.owner_type == "team")
-                    .group_by(PointsEntry.owner_id)
-                )
-            ).all()
-            team_points = {owner_id: float(total) for owner_id, total in team_rows}
+        team_rows = s.execute(
+            _window(
+                select(PointsEntry.owner_id, func.sum(PointsEntry.points))
+                .where(PointsEntry.owner_type == "team")
+                .group_by(PointsEntry.owner_id)
+            )
+        ).all()
+        team_points = {owner_id: float(total) for owner_id, total in team_rows}
 
-            player_totals = {}
-            for owner_id, total in s.execute(
-                _window(
-                    select(PointsEntry.owner_id, func.sum(PointsEntry.points))
-                    .where(PointsEntry.owner_type == "player")
-                    .group_by(PointsEntry.owner_id)
-                )
-            ).all():
-                player_totals[owner_id] = float(total)
+        player_totals: dict[str, float] = {}
+        for owner_id, total in s.execute(
+            _window(
+                select(PointsEntry.owner_id, func.sum(PointsEntry.points))
+                .where(PointsEntry.owner_type == "player")
+                .group_by(PointsEntry.owner_id)
+            )
+        ).all():
+            player_totals[owner_id] = float(total)
 
         via_team: dict[tuple[str, str], float] = {}
-        via_stmt = select(
-            PointsEntry.team_context, PointsEntry.owner_id, func.sum(PointsEntry.points)
-        ).where(PointsEntry.owner_type == "player", PointsEntry.team_context.is_not(None))
-        if best_n is None:
-            via_stmt = _window(via_stmt)
-        # best_n 模式下按队排除的口径不变（只影响成员总分怎么算），排除量仍取全量
         for team_id, owner_id, total in s.execute(
-            via_stmt.group_by(PointsEntry.team_context, PointsEntry.owner_id)
+            _window(
+                select(PointsEntry.team_context, PointsEntry.owner_id, func.sum(PointsEntry.points))
+                .where(PointsEntry.owner_type == "player", PointsEntry.team_context.is_not(None))
+                .group_by(PointsEntry.team_context, PointsEntry.owner_id)
+            )
         ).all():
             via_team[(team_id, owner_id)] = float(total)
 
