@@ -321,3 +321,87 @@ def test_points_formula_derives_max_value(repo):
         contest_id="json_derive", counts_for_points=True, max_value=None,
     ))
     assert doc.max_value == 5, "应按全场最高解题数推导 max_value"
+
+# ---- 姓名歧义的人工决议 ----
+
+
+def _ambiguous_doc(**overrides):
+    base = _team_doc(
+        contest_id="json_amb",
+        tier="新队员组",
+        standings=[{"team_name": "甲队", "members": ["重名者"], "rank": 1, "solved": 3}],
+    )
+    base.update(overrides)
+    return base
+
+
+@pytest.fixture
+def two_same_name(db_session):
+    from xcpc_core.db.tables import Player as PlayerRow
+
+    db_session.add_all([
+        PlayerRow(id="pA", name="重名者", grade=2024, status="active"),
+        PlayerRow(id="pB", name="重名者", grade=2025, status="active"),
+    ])
+    db_session.commit()
+    return db_session
+
+
+def test_ambiguity_without_decision_skips_row(repo, two_same_name):
+    with pytest.raises(ValueError, match="没有任何成绩行可导入"):
+        import_contest_json(_ambiguous_doc(), repo_root=repo, session=two_same_name)
+
+
+def test_decision_by_player_id_resolves(repo, two_same_name):
+    result = import_contest_json(
+        _ambiguous_doc(), decisions={"重名者": {"player_id": "pB"}},
+        repo_root=repo, session=two_same_name,
+    )
+    assert result.standings_imported == 1
+    assert not result.unmatched_players
+
+    from xcpc_core.db.tables import StandingMember
+
+    ids = two_same_name.scalars(select(StandingMember.player_id)).all()
+    assert list(ids) == ["pB"], "决议指定的选手必须被采用"
+
+
+def test_decision_new_forces_creation(repo, two_same_name):
+    before = len(two_same_name.scalars(select(Player)).all())
+    result = import_contest_json(
+        _ambiguous_doc(), decisions={"重名者": {"action": "new", "grade": 2026}},
+        repo_root=repo, session=two_same_name,
+    )
+    after = len(two_same_name.scalars(select(Player)).all())
+    assert after == before + 1, "action=new 应强制新建，不猜已有重名者"
+    assert result.standings_imported == 1
+    assert result.players_created
+
+
+def test_decision_new_without_grade_uses_default(repo, two_same_name):
+    """grade 缺省时应回落到 default_grade，不能 int(None) 崩。"""
+    result = import_contest_json(
+        _ambiguous_doc(), decisions={"重名者": {"action": "new"}},
+        default_grade=2023, repo_root=repo, session=two_same_name,
+    )
+    assert result.standings_imported == 1
+    created_id = result.players_created[0].player_id
+    player = two_same_name.get(Player, created_id)
+    assert player.grade == 2023
+
+
+def test_invalid_decision_falls_back_to_normal_matching(repo, db_session):
+    """决议格式不对（无 player_id 也无 action）→ 回退常规匹配，而非整行失败。"""
+    from xcpc_core.db.tables import Player as PlayerRow
+
+    db_session.add(PlayerRow(id="pX", name="唯一者", grade=2024, status="active"))
+    db_session.commit()
+    doc = _team_doc(
+        contest_id="json_baddeg", tier="新队员组",
+        standings=[{"team_name": "甲队", "members": ["唯一者"], "rank": 1, "solved": 2}],
+    )
+    result = import_contest_json(
+        doc, decisions={"唯一者": {"garbage": True}}, repo_root=repo, session=db_session
+    )
+    assert result.standings_imported == 1
+    assert not result.unmatched_players

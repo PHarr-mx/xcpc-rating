@@ -45,6 +45,7 @@ def import_contest_json(
     *,
     auto_create_players: bool = True,
     default_grade: int | None = None,
+    decisions: dict[str, dict[str, Any]] | None = None,
     repo_root: Path | None = None,
     session: Session | None = None,
 ):
@@ -53,6 +54,7 @@ def import_contest_json(
         document,
         auto_create_players=auto_create_players,
         default_grade=default_grade,
+        decisions=decisions,
         repo_root=repo_root,
         session=session or _default_session,
     )

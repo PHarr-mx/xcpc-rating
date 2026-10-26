@@ -173,3 +173,101 @@ def test_existing_contest_flagged_in_preview(build_state, make_user, core_store)
     # 再传一次同 ID → 预览应提示将覆盖
     _upload(st, _doc())
     assert st.json_header["existing"] is True
+
+# ---- 姓名歧义的人工决议（与 xlsx 通道同口径）-------------------------------
+
+
+def _seed_same_name(session) -> None:
+    """造两个同名选手，制造真实的姓名歧义。"""
+    session.add_all([Player(id="p001", name="张伟"), Player(id="p002", name="张伟")])
+    session.commit()
+
+
+def test_ambiguous_name_blocks_row_without_decision(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(
+        contest_id="amb1",
+        standings=[{"team_name": "甲队", "members": ["张伟"], "rank": 1, "solved": 5}],
+    ))
+
+    assert st.json_unresolved_count == 1
+    assert st.json_ambiguous[0]["name"] == "张伟"
+    assert st.json_ambiguous[0]["current"] == ""
+
+    # 未决议 → 确认后该行被跳过
+    st.confirm_json_import()
+    assert st.admin_error != "", "全部行被跳过时应报错"
+
+
+def test_decision_resolves_ambiguity_and_imports(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(
+        contest_id="amb2",
+        standings=[{"team_name": "甲队", "members": ["张伟"], "rank": 1, "solved": 5}],
+    ))
+
+    st.set_json_decision("张伟", "p002")
+    assert st.json_unresolved_count == 0
+
+    st.confirm_json_import()
+    assert st.admin_error == ""
+    assert "已导入" in st.admin_feedback
+
+    # 决议生效：用的是 p002
+    from sqlalchemy import select as sel
+    from xcpc_core.db.tables import StandingMember
+
+    member_ids = core_store.scalars(sel(StandingMember.player_id)).all()
+    assert list(member_ids) == ["p002"]
+
+
+def test_decision_new_creates_player(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(
+        contest_id="amb3",
+        standings=[{"team_name": "甲队", "members": ["张伟"], "rank": 1, "solved": 5}],
+    ))
+
+    st.set_json_decision("张伟", "new")
+    assert st.json_unresolved_count == 0
+    st.confirm_json_import()
+
+    assert st.admin_error == ""
+    assert "新建选手 1 名" in st.admin_feedback or "新建选手" in st.admin_feedback
+
+
+def test_decision_payload_conversion(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(contest_id="amb4"))
+
+    st.set_json_decision("甲", "p001")
+    st.set_json_decision("乙", "new:2025")
+    payload = st._decisions_payload()
+
+    assert payload["甲"] == {"player_id": "p001"}
+    assert payload["乙"] == {"action": "new", "grade": 2025}
+
+
+def test_clear_decision(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(contest_id="amb5"))
+
+    st.set_json_decision("张伟", "p001")
+    st.set_json_decision("张伟", "")
+    assert st.json_decisions == {}
+
+
+def test_upload_resets_previous_decisions(build_state, make_user, core_store):
+    _seed_same_name(core_store)
+    st = build_state(AdminImportState, make_user("root", role="admin"))
+    _upload(st, _doc(contest_id="amb6"))
+    st.set_json_decision("张伟", "p001")
+    assert st.json_decisions
+
+    _upload(st, _doc(contest_id="amb7"))
+    assert st.json_decisions == {}, "重新上传应清空上一次的决议"

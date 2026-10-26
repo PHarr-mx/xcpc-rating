@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 import reflex_local_auth
 
+from xcpc_core.audit import record as audit_record
 from xcpc_core.tier import api as tier_api
 from xcpc_core.tier.models import AwardLevelCreate, AwardLevelUpdate, TierCreate, TierUpdate
 
@@ -117,13 +118,31 @@ class AdminTiersState(AdminState):
             return
         try:
             if self.editing_tier_id:
+                tier_id = int(self.editing_tier_id)
+                before = tier_api.get_tier(tier_id)
                 tier_api.update_tier(
-                    int(self.editing_tier_id),
+                    tier_id,
                     TierUpdate(name=name, coefficient=coefficient, sort_order=sort_order),
+                )
+                self._write_audit(
+                    action="tier.update",
+                    target=str(tier_id),
+                    diff={
+                        "name": {"from": before.name, "to": name},
+                        "coefficient": {"from": before.coefficient, "to": coefficient},
+                        "sort_order": {"from": before.sort_order, "to": sort_order},
+                    },
                 )
                 self.admin_feedback = f"已更新赛事等级「{name}」"
             else:
-                tier_api.create_tier(TierCreate(name=name, coefficient=coefficient, sort_order=sort_order))
+                created = tier_api.create_tier(
+                    TierCreate(name=name, coefficient=coefficient, sort_order=sort_order)
+                )
+                self._write_audit(
+                    action="tier.create",
+                    target=str(created.id),
+                    diff={"name": name, "coefficient": coefficient, "sort_order": sort_order},
+                )
                 self.admin_feedback = f"已创建赛事等级「{name}」"
         except Exception as exc:
             self.admin_error = str(exc)
@@ -152,9 +171,22 @@ class AdminTiersState(AdminState):
         self.admin_error = ""
         try:
             tier_api.delete_tier(tier_id)
+            self._write_audit(action="tier.delete", target=str(tier_id), diff={})
             self.admin_feedback = f"已删除赛事等级 #{tier_id}"
         except Exception as exc:
             self.admin_error = str(exc)
+
+    def _write_audit(self, *, action: str, target: str, diff: dict) -> None:
+        """写审计（best-effort：审计不可用不应阻塞已完成的写操作）。"""
+        try:
+            audit_record(
+                action=action,
+                target=target,
+                user_id=self.authenticated_user.id,
+                diff_json=diff,
+            )
+        except Exception:
+            pass
 
     def _reset_tier_form(self):
         self.editing_tier_id = ""
@@ -182,14 +214,25 @@ class AdminTiersState(AdminState):
             return
         try:
             if self.editing_award_id:
+                level_id = int(self.editing_award_id)
                 tier_api.update_award_level(
-                    int(self.editing_award_id),
+                    level_id,
                     AwardLevelUpdate(name=name, base_points=base_points, sort_order=sort_order),
+                )
+                self._write_audit(
+                    action="award.update",
+                    target=str(level_id),
+                    diff={"name": name, "base_points": base_points, "sort_order": sort_order},
                 )
                 self.admin_feedback = f"已更新奖项「{name}」"
             else:
-                tier_api.create_award_level(
+                created = tier_api.create_award_level(
                     AwardLevelCreate(name=name, base_points=base_points, sort_order=sort_order)
+                )
+                self._write_audit(
+                    action="award.create",
+                    target=str(created.id),
+                    diff={"name": name, "base_points": base_points, "sort_order": sort_order},
                 )
                 self.admin_feedback = f"已创建奖项「{name}」"
         except Exception as exc:
@@ -219,6 +262,7 @@ class AdminTiersState(AdminState):
         self.admin_error = ""
         try:
             tier_api.delete_award_level(level_id)
+            self._write_audit(action="award.delete", target=str(level_id), diff={})
             self.admin_feedback = f"已删除奖项 #{level_id}"
         except Exception as exc:
             self.admin_error = str(exc)

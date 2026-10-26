@@ -38,6 +38,8 @@ class AdminImportState(AdminState):
     json_path: str = ""
     json_filename: str = ""
     json_preview: dict = {}
+    #: 歧义姓名 → 决议。``{"张三": "p001"}`` 指定选手，``{"张三": "new:2025"}`` 强制新建。
+    json_decisions: dict[str, str] = {}
 
     admin_feedback: str = ""
     admin_error: str = ""
@@ -223,6 +225,7 @@ class AdminImportState(AdminState):
         self.json_path = str(target)
         self.json_filename = filename
         self.json_preview = preview
+        self.json_decisions = {}
         self.admin_feedback = f"已解析：{filename}，请核对匹配结果后确认写入"
 
     def _remove_json_file(self) -> None:
@@ -238,6 +241,7 @@ class AdminImportState(AdminState):
         self.json_path = ""
         self.json_filename = ""
         self.json_preview = {}
+        self.json_decisions = {}
 
     @rx.var(cache=False)
     def json_rows(self) -> list[dict]:
@@ -284,6 +288,79 @@ class AdminImportState(AdminState):
         }
 
     @rx.event
+    def set_json_decision(self, name: str, value: str) -> None:
+        """记录一名歧义选手的决议（下拉选择）。空值 = 清除决议。"""
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        decisions = dict(self.json_decisions)
+        if value:
+            decisions[name] = value
+        else:
+            decisions.pop(name, None)
+        self.json_decisions = decisions
+
+    @rx.var(cache=False)
+    def json_decision_options(self) -> list[str]:
+        """歧义下拉的选项：全量选手 + ``new``（强制新建）。
+
+        与 xlsx 通道的 ``player_option_ids`` 同口径——Reflex 的 rx.select 只接受
+        State 级扁平列表，不能按行传 Var 列表。
+        """
+        if not self.is_admin:
+            return []
+        try:
+            return ["new", *(p.id for p in player_api.list_players(include_left=True))]
+        except Exception:
+            return ["new"]
+
+    @rx.var(cache=False)
+    def json_ambiguous(self) -> list[dict]:
+        """歧义明细 + 该姓名的当前决议（供页面渲染下拉）。"""
+        if not self.is_admin or not self.json_preview:
+            return []
+        rows: list[dict] = []
+        for item in self.json_preview.get("ambiguous") or []:
+            for name in item["members"]:
+                candidates = (item.get("candidates") or {}).get(name) or []
+                rows.append({
+                    "row": item["row"],
+                    "team": item["name"],
+                    "name": name,
+                    "current": self.json_decisions.get(name, ""),
+                    "options": [c["player_id"] for c in candidates],
+                    "option_labels": [
+                        f'{c["player_id"]} {c["name"]}' for c in candidates
+                    ],
+                })
+        return rows
+
+    @rx.var(cache=False)
+    def json_unresolved_count(self) -> int:
+        """尚未决议的歧义姓名数（确认前必须为 0 才允许写入那些行）。"""
+        if not self.is_admin or not self.json_preview:
+            return 0
+        total = 0
+        for item in self.json_preview.get("ambiguous") or []:
+            for name in item["members"]:
+                if not self.json_decisions.get(name):
+                    total += 1
+        return total
+
+    def _decisions_payload(self) -> dict:
+        """把 ``{"张三": "p001" | "new:2025"}`` 转成 core 的 decisions 结构。"""
+        payload: dict = {}
+        for name, value in self.json_decisions.items():
+            if not value:
+                continue
+            if value.startswith("new"):
+                _, _, grade = value.partition(":")
+                payload[name] = {"action": "new", "grade": int(grade) if grade else None}
+            else:
+                payload[name] = {"player_id": value}
+        return payload
+
+    @rx.event
     def confirm_json_import(self):
         """确认写入：真正的落库与归档。"""
         guard = self._require_admin()
@@ -295,7 +372,9 @@ class AdminImportState(AdminState):
             self.admin_error = "请先上传 JSON 文件"
             return
         try:
-            result = importer_api.import_contest_json(self.json_path)
+            result = importer_api.import_contest_json(
+                self.json_path, decisions=self._decisions_payload()
+            )
         except Exception as exc:
             self.admin_error = f"导入失败：{exc}"
             return

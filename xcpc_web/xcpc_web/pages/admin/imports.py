@@ -107,8 +107,8 @@ def _content() -> rx.Component:
     return rx.vstack(
         rx.heading("在线导入", size="7"),
         rx.text(
-            "两条通道并列：**正式赛 xlsx**（五步 staged，可人工决议未匹配选手）与"
-            "**通用比赛 JSON**（元信息在文件内，预览后确认）。",
+            "两条通道并列：正式赛 xlsx（五步 staged，可人工决议未匹配选手）"
+            "与通用比赛 JSON（元信息在文件内，预览后确认）。",
             color_scheme="gray",
         ),
         _steps(), _feedback(), _upload(),
@@ -193,9 +193,60 @@ def _json_channel() -> rx.Component:
                         width="100%",
                     ),
                     rx.cond(
+                        AdminImportState.json_ambiguous.length() > 0,
+                        rx.vstack(
+                            rx.separator(size="4"),
+                            rx.heading("姓名歧义处理", size="3"),
+                            rx.text(
+                                "以下姓名在名册中匹配到多人。请为每人指定对应选手，"
+                                "或选择「新建」为其建档；未决议的行在写入时会被跳过。",
+                                size="2",
+                                color_scheme="orange",
+                            ),
+                            rx.table.root(
+                                rx.table.header(
+                                    rx.table.row(
+                                        rx.table.column_header_cell("队伍"),
+                                        rx.table.column_header_cell("姓名"),
+                                        rx.table.column_header_cell("决议"),
+                                    )
+                                ),
+                                rx.table.body(
+                                    rx.foreach(
+                                        AdminImportState.json_ambiguous,
+                                        lambda row: rx.table.row(
+                                            rx.table.cell(row["team"]),
+                                            rx.table.cell(row["name"]),
+                                            rx.table.cell(
+                                                rx.select(
+                                                    AdminImportState.json_decision_options,
+                                                    value=row["current"],
+                                                    placeholder="选择选手 ID 或 new",
+                                                    on_change=lambda value: AdminImportState.set_json_decision(
+                                                        row["name"], value
+                                                    ),
+                                                    width="100%",
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                width="100%",
+                            ),
+                            rx.text(
+                                f"未决议：{AdminImportState.json_unresolved_count} 人",
+                                size="1",
+                                color_scheme="gray",
+                            ),
+                            spacing="2",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
                         AdminImportState.json_header["blocked"],
                         rx.callout(
-                            "存在姓名歧义的队伍，确认写入会被跳过。建议先在「选手管理」处理重名或补充别名。",
+                            "上表未决议的姓名，其所在队伍在写入时会被跳过。",
                             icon="triangle_alert",
                             color_scheme="orange",
                             width="100%",

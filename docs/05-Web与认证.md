@@ -145,10 +145,10 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 所有写操作落 `auditlog`（`xcpc_core/audit/api.py`，best-effort 跨库写，失败不回滚业务）：
 `player.create|update|delete`、`team.create|update|delete`、`contest.create|delete`、
-`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`weights.apply`。
+`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`tier.create|update|delete`、`award.create|update|delete`、`weights.apply`。
 `diff_json` 只存变化字段；`/admin/audit` 按 user/action/日期筛选。
 
-> 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD **未接审计**；OJ 账号编辑与角色变更也无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。
+> 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD 已接审计（`tier.*` / `award.*`，更新时留前后值）；OJ 账号编辑与角色变更仍无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。
 
 ## 8. Web 测试基建
 

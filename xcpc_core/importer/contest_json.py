@@ -43,7 +43,8 @@ from xcpc_core.importer.models import (
     UnmatchedTeam,
 )
 from xcpc_core.importer.players import resolve_default_grade, resolve_member_names
-from xcpc_core.player.api import find_by_name
+from xcpc_core.player.api import create_player, find_by_name
+from xcpc_core.player.models import PlayerCreate, PlayerStatus
 from xcpc_core.player.store import PlayerStore, find_repo_root
 from xcpc_core.tier.api import ensure_fallback_tier, ensure_tier_for_contest_type, find_tier_by_name
 from xcpc_core.team.service import TeamService
@@ -190,6 +191,101 @@ def _contest_create_from_document(
     )
 
 
+def _resolve_row_members(
+    member_names: list[str],
+    *,
+    decisions: dict[str, dict[str, Any]],
+    contest_id: str,
+    team_name: str,
+    rank: int,
+    player_store: PlayerStore,
+    auto_create: bool,
+    default_grade: int,
+    today: date,
+    plog: Plog | None,
+) -> tuple[list[str] | None, list[UnmatchedPlayer], list[CreatedPlayer], bool]:
+    """逐名解析一行队员，**人工决议优先**。
+
+    与 ``resolve_member_names`` 的区别：本函数按姓名逐个处理，已决议的姓名直接
+    采用（指定 ID 或强制新建），未决议的走常规匹配；因此部分队员有决议时，
+    其余队员仍能正常匹配，不会被整行拖累。
+
+    返回 ``(player_ids | None, unmatched, created, blocked_by_ambiguity)``；
+    ``player_ids`` 为 None 表示该行不可导入（有歧义未决议 / 有无法解析的姓名）。
+    顺序与 ``member_names`` 一致。
+    """
+    ids: list[str] = []
+    unmatched: list[UnmatchedPlayer] = []
+    created: list[CreatedPlayer] = []
+    blocked = False
+
+    for name in member_names:
+        decision = decisions.get(name)
+        if decision:
+            action = str(decision.get("action") or "").strip().lower()
+            if action in {"new", "create", "新建"}:
+                raw_grade = decision.get("grade")
+                grade = int(raw_grade) if raw_grade is not None else default_grade
+                player = create_player(
+                    PlayerCreate(name=name, grade=grade, status=PlayerStatus.active),
+                    today=today,
+                    store=player_store,
+                )
+                created.append(
+                    CreatedPlayer(
+                        player_id=player.id, name=player.name,
+                        team_name=team_name, contest_id=contest_id,
+                    )
+                )
+                ids.append(player.id)
+                if plog:
+                    plog.info("按决议新建选手", name=name, player_id=player.id)
+                continue
+            target = str(decision.get("player_id") or decision.get("id") or "").strip()
+            if target:
+                ids.append(target)
+                continue
+            # 决议格式不对 → 视为无效，落到常规匹配
+            if plog:
+                plog.warning("决议无效，回退常规匹配", name=name, decision=decision)
+
+        matches = find_by_name(name, store=player_store)
+        if len(matches) == 1:
+            ids.append(matches[0].id)
+        elif len(matches) > 1:
+            blocked = True
+            unmatched.append(
+                UnmatchedPlayer(
+                    contest_id=contest_id, name=name, team_name=team_name, rank=rank
+                )
+            )
+        elif auto_create:
+            player = create_player(
+                PlayerCreate(name=name, grade=default_grade, status=PlayerStatus.active),
+                today=today,
+                store=player_store,
+            )
+            created.append(
+                CreatedPlayer(
+                    player_id=player.id, name=player.name,
+                    team_name=team_name, contest_id=contest_id,
+                )
+            )
+            ids.append(player.id)
+            if plog:
+                plog.info("自动建档选手", name=name, player_id=player.id)
+        else:
+            unmatched.append(
+                UnmatchedPlayer(
+                    contest_id=contest_id, name=name, team_name=team_name, rank=rank
+                )
+            )
+
+    if unmatched:
+        return None, unmatched, created, blocked
+    return ids, [], created, blocked
+
+
 def preview_contest_json(
     document: ContestJsonDocument | dict[str, Any] | Path | str,
     *,
@@ -235,7 +331,18 @@ def preview_contest_json(
                     will_create_players.append(name)
                     row_unmatched.append(name)
             if row_ambiguous:
-                ambiguous.append({"row": index, "name": label, "members": row_ambiguous})
+                ambiguous.append({
+                    "row": index,
+                    "name": label,
+                    "members": row_ambiguous,
+                    "candidates": {
+                        name: [
+                            {"player_id": p.id, "name": p.name, "grade": p.grade}
+                            for p in find_by_name(name, store=player_store)
+                        ]
+                        for name in row_ambiguous
+                    },
+                })
             rows.append({
                 "index": index,
                 "name": label,
@@ -300,6 +407,7 @@ def import_contest_json(
     *,
     auto_create_players: bool = True,
     default_grade: int | None = None,
+    decisions: dict[str, dict[str, Any]] | None = None,
     plog: Plog | None = None,
     repo_root: Path | None = None,
     session: Session | None = None,
@@ -309,6 +417,11 @@ def import_contest_json(
 
     ``document`` 可以是已解析的 DTO、原始 dict，或指向模板 JSON 文件的路径。
     raw 归档写到 ``data/raw/contests/{contest_id}.json``（P-U3 统一目录）。
+
+    ``decisions`` 为**姓名歧义的人工决议**（与 xlsx staged 同口径）：
+    ``{"张三": {"player_id": "p001"}}`` 指定已有选手，或
+    ``{"张三": {"action": "new", "grade": 2025}}`` 强制新建。未提供决议的歧义行
+    仍按旧行为跳过并报告。
     """
     root = repo_root or find_repo_root()
 
@@ -340,12 +453,14 @@ def import_contest_json(
 
         for row in parsed.standings:
             label = row.team_name or "、".join(row.members)
-            player_ids, row_unmatched, row_created = resolve_member_names(
+            # 人工决议优先：已决议的姓名直接取 ID（或强制新建），并保持原始顺序
+            player_ids, row_unmatched, row_created, row_blocked = _resolve_row_members(
+                row.members,
+                decisions=decisions or {},
                 contest_id=parsed.contest_id,
                 team_name=label,
                 rank=row.rank or 0,
-                member_names=row.members,
-                store=player_store,
+                player_store=player_store,
                 auto_create=auto_create_players,
                 default_grade=default_grade,
                 today=today,
@@ -355,7 +470,7 @@ def import_contest_json(
             players_created.extend(row_created)
 
             if player_ids is None:
-                reason = "姓名存在歧义，无法唯一匹配" if row_unmatched else "队员无法解析"
+                reason = "姓名存在歧义且未提供决议" if row_blocked else "队员无法解析"
                 unmatched_teams.append(
                     UnmatchedTeam(
                         contest_id=parsed.contest_id,
