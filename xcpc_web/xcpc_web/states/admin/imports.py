@@ -34,6 +34,11 @@ class AdminImportState(AdminState):
     form_default_grade: str = ""
     decisions: dict[str, str] = {}
 
+    # ---- 通用 JSON 通道（P-U3）----
+    json_path: str = ""
+    json_filename: str = ""
+    json_preview: dict = {}
+
     admin_feedback: str = ""
     admin_error: str = ""
 
@@ -177,6 +182,148 @@ class AdminImportState(AdminState):
         self.upload_filename = filename
         self.step = 2
         self.admin_feedback = f"已上传：{filename}，请填写比赛元信息"
+
+    # ---- 通用 JSON 通道 ----
+
+    @rx.event
+    async def handle_json_upload(self, files: list[rx.UploadFile]):
+        """上传通用比赛 JSON：只做只读预览，不写库。"""
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self.admin_error = ""
+        self.admin_feedback = ""
+        self.json_preview = {}
+        if not files:
+            self.admin_error = "请选择一个 JSON 文件"
+            return
+        upload = files[0]
+        filename = Path(upload.filename or "contest.json").name
+        if not filename.casefold().endswith(".json"):
+            self.admin_error = "通用比赛导入只接受 .json 文件"
+            return
+
+        fd, target_name = tempfile.mkstemp(
+            prefix=f"xcpc-json-{self.authenticated_user.id}-", suffix=".json"
+        )
+        close(fd)
+        target = Path(target_name)
+        try:
+            if getattr(upload, "path", None):
+                shutil.copyfile(upload.path, target)
+            else:
+                target.write_bytes(await upload.read())
+            preview = importer_api.preview_contest_json(target)
+        except Exception as exc:
+            target.unlink(missing_ok=True)
+            self.admin_error = f"解析失败：{exc}"
+            return
+
+        self._remove_json_file()
+        self.json_path = str(target)
+        self.json_filename = filename
+        self.json_preview = preview
+        self.admin_feedback = f"已解析：{filename}，请核对匹配结果后确认写入"
+
+    def _remove_json_file(self) -> None:
+        if not self.json_path:
+            return
+        try:
+            Path(self.json_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    def _reset_json_state(self) -> None:
+        self._remove_json_file()
+        self.json_path = ""
+        self.json_filename = ""
+        self.json_preview = {}
+
+    @rx.var(cache=False)
+    def json_rows(self) -> list[dict]:
+        """预览行 → 展示视图（匹配数/新建数/是否受阻）。"""
+        if not self.is_admin or not self.json_preview:
+            return []
+        return [
+            {
+                "index": row["index"],
+                "name": row["name"],
+                "members": "、".join(row["members"]),
+                "rank": row["rank"] if row["rank"] is not None else "-",
+                "matched": len(row["matched"]),
+                "to_create": len(row["to_create"]),
+                "blocked": row["blocked"],
+                "status": "姓名歧义" if row["blocked"] else (
+                    "全部已存在" if not row["to_create"] else "将新建选手"
+                ),
+            }
+            for row in self.json_preview.get("rows", [])
+        ]
+
+    @rx.var(cache=False)
+    def json_has_preview(self) -> bool:
+        return self.is_admin and bool(self.json_preview)
+
+    @rx.var(cache=False)
+    def json_header(self) -> dict:
+        """预览头部展示字段（Var 里不能拼接字符串，故在 State 预算）。"""
+        preview = self.json_preview
+        if not self.is_admin or not preview:
+            return {}
+        players = preview.get("players_to_create") or []
+        blocked = preview.get("blocked_count") or 0
+        return {
+            "title": preview.get("title", ""),
+            "contest_id": preview.get("contest_id", ""),
+            "tier_name": preview.get("tier_name", ""),
+            "format_entity": f"{preview.get('format', '')} × {preview.get('entity', '')}",
+            "to_create_label": f"将新建选手 {len(players)} 名",
+            "rows_label": f"{len(preview.get('rows') or [])} 条成绩",
+            "existing": bool(preview.get("existing_contest")),
+            "blocked": blocked > 0,
+        }
+
+    @rx.event
+    def confirm_json_import(self):
+        """确认写入：真正的落库与归档。"""
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self.admin_error = ""
+        self.admin_feedback = ""
+        if not self.json_path:
+            self.admin_error = "请先上传 JSON 文件"
+            return
+        try:
+            result = importer_api.import_contest_json(self.json_path)
+        except Exception as exc:
+            self.admin_error = f"导入失败：{exc}"
+            return
+        audit_record(
+            action="import.json_confirm",
+            target=result.contest_id,
+            user_id=self.authenticated_user.id,
+            diff_json={
+                "contest_id": result.contest_id,
+                "standings": result.standings_imported,
+                "players_created": len(result.players_created),
+                "source_file": result.source_file,
+            },
+        )
+        self._reset_json_state()
+        self.admin_feedback = (
+            f"已导入「{result.title}」：{result.standings_imported} 条成绩，"
+            f"新建选手 {len(result.players_created)} 名，赛事等级「{result.tier_name}」"
+        )
+
+    @rx.event
+    def discard_json_import(self):
+        guard = self._require_admin()
+        if guard is not None:
+            return guard
+        self._reset_json_state()
+        self.admin_feedback = "已取消，未写入任何数据"
+        self.admin_error = ""
 
     @rx.event
     def clear_upload(self):

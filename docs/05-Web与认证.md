@@ -45,7 +45,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `/admin/points` | 积分认证审批（场次创建已并入比赛管理；P-U1） | admin | ✅ |
 | `/points` | 生涯积分：提交认证（按 scoring 切换表单）+ 我的认证 + 个人/队伍双榜 | member | ✅ |
 | `/admin/audit` | 审计日志筛选（只读） | admin | ✅ |
-| `/admin/import` | xlsx 在线导入五步 | admin | ✅ |
+| `/admin/import` | 在线导入两通道：正式赛 xlsx 五步 staged + 通用比赛 JSON 两段（预览→确认） | admin | ✅ 2026-10-26（JSON 通道） |
 | `/players/{player_id}` | 选手详情：档案 + OJ 外链 + Rating 曲线 + 参赛记录；绑定本人显示「编辑我的资料」 | guest | ✅ 2026-09-11 |
 | `/contests/{contest_id}` | 比赛详情：元信息行 + 成绩表按 format 切列（xcpc：解题/罚时；oi：得分）；队员姓名解析、打星标记、奖项中文 | guest | ✅ 2026-09-14 |
 | `/admin/rating` | 权重试算：左调公式参数、右看与当前榜单逐人 diff；试算不落库不进缓存，「应用」写 YAML + bump + 审计 | admin | ✅ 2026-10-26 |
@@ -145,7 +145,7 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 
 所有写操作落 `auditlog`（`xcpc_core/audit/api.py`，best-effort 跨库写，失败不回滚业务）：
 `player.create|update|delete`、`team.create|update|delete`、`contest.create|delete`、
-`import.confirm`、`binding.approve|reject`、`points.approve|reject`、`weights.apply`。
+`import.confirm`、`import.json_confirm`、`binding.approve|reject`、`points.approve|reject`、`points.auto_record`、`weights.apply`。
 `diff_json` 只存变化字段；`/admin/audit` 按 user/action/日期筛选。
 
 > 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD **未接审计**；OJ 账号编辑与角色变更也无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。

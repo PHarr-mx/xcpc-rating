@@ -186,3 +186,30 @@ def build_state(web_engine):
         return state
 
     return _build
+
+@pytest.fixture(autouse=True)
+def isolate_repo_root(tmp_path, monkeypatch):
+    """把 importer / lab 的 repo_root 重定向到临时目录。
+
+    导入类测试（xlsx staged 确认、通用 JSON 写入）会写 `data/raw/` 归档与
+    `data/config/` 产物；不隔离就会污染真实仓库（曾泄漏过
+    `data/raw/contests/<id>.json`）。复制两份 config，保证 tier 种子与
+    学校匹配名可用。
+    """
+    import shutil
+
+    from xcpc_core.player.store import find_repo_root
+
+    real_root = find_repo_root()
+    (tmp_path / "data/config").mkdir(parents=True, exist_ok=True)
+    for name in ("contest_weights.yaml", "school.yaml", "points.yaml"):
+        source = real_root / "data" / "config" / name
+        if source.is_file():
+            shutil.copy(source, tmp_path / "data" / "config" / name)
+    (tmp_path / "data/raw/formal").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data/raw/contests").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("xcpc_core.importer.contest_json.find_repo_root", lambda: tmp_path)
+    monkeypatch.setattr("xcpc_core.importer.formal.find_repo_root", lambda: tmp_path, raising=False)
+    monkeypatch.setattr("xcpc_core.rating.lab.find_repo_root", lambda: tmp_path, raising=False)
+    yield tmp_path

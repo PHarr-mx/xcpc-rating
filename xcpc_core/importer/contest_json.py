@@ -26,6 +26,7 @@ from xcpc_core.contest.api import save_contest
 from xcpc_core.contest.models import ContestCreate, Standing
 from xcpc_core.contest.store import ContestStore
 from xcpc_core.db.session import make_session_factory
+from xcpc_core.db.tables import Contest as ContestRow
 from xcpc_core.importer.config import competition_year, load_default_player_grade, season_label
 from xcpc_core.importer.formal import resolve_team
 from xcpc_core.importer.formal_store import (
@@ -42,6 +43,7 @@ from xcpc_core.importer.models import (
     UnmatchedTeam,
 )
 from xcpc_core.importer.players import resolve_default_grade, resolve_member_names
+from xcpc_core.player.api import find_by_name
 from xcpc_core.player.store import PlayerStore, find_repo_root
 from xcpc_core.tier.api import ensure_fallback_tier, ensure_tier_for_contest_type, find_tier_by_name
 from xcpc_core.team.service import TeamService
@@ -186,6 +188,111 @@ def _contest_create_from_document(
         source_file=source_file,
         standings=standings,
     )
+
+
+def preview_contest_json(
+    document: ContestJsonDocument | dict[str, Any] | Path | str,
+    *,
+    repo_root: Path | None = None,
+    session: Session | None = None,
+) -> dict[str, Any]:
+    """**只读**预览：校验模板 + 尝试姓名匹配，不写库、不归档、不建档。
+
+    Web 上传要在「确认写入」之前看到「谁会匹配、谁会新建、谁有歧义」，
+    与正式赛 staged 的预览阶段等价，但通用 JSON 的元信息都在文件里，
+    所以不需要元信息表单——只需一次只读匹配。
+    """
+    if isinstance(document, (str, Path)):
+        from xcpc_core.importer.formal_store import load_raw_contest
+
+        parsed = ContestJsonDocument.model_validate(load_raw_contest(Path(document)))
+    elif isinstance(document, ContestJsonDocument):
+        parsed = document
+    else:
+        parsed = ContestJsonDocument.model_validate(document)
+
+    root = repo_root or find_repo_root()
+    session, close_session = _resolve_session(session)
+    try:
+        player_store = PlayerStore(session)
+        tier_name = _preview_tier_name(parsed, session=session, repo_root=root)
+
+        rows: list[dict[str, Any]] = []
+        will_create_players: list[str] = []
+        ambiguous: list[dict[str, Any]] = []
+        for index, row in enumerate(parsed.standings, start=1):
+            label = row.team_name or "、".join(row.members)
+            matched: list[dict[str, str]] = []
+            row_unmatched: list[str] = []
+            row_ambiguous: list[str] = []
+            for name in row.members:
+                found = find_by_name(name, store=player_store)
+                if len(found) == 1:
+                    matched.append({"name": name, "player_id": found[0].id})
+                elif len(found) > 1:
+                    row_ambiguous.append(name)
+                else:
+                    will_create_players.append(name)
+                    row_unmatched.append(name)
+            if row_ambiguous:
+                ambiguous.append({"row": index, "name": label, "members": row_ambiguous})
+            rows.append({
+                "index": index,
+                "name": label,
+                "members": row.members,
+                "rank": row.rank,
+                "matched": matched,
+                "to_create": row_unmatched,
+                "ambiguous": row_ambiguous,
+                "blocked": bool(row_ambiguous),
+            })
+
+        return {
+            "contest_id": parsed.contest_id,
+            "title": parsed.title,
+            "date": parsed.date.isoformat(),
+            "format": parsed.format,
+            "entity": parsed.entity,
+            "tier_name": tier_name,
+            "scoring": parsed.scoring,
+            "counts_for_points": parsed.counts_for_points,
+            "counts_for_ranking": parsed.counts_for_ranking,
+            "allow_claims": parsed.allow_claims,
+            "n_teams": parsed.n_teams or len(parsed.standings),
+            "max_value": parsed.max_value,
+            "rows": rows,
+            "players_to_create": sorted(set(will_create_players)),
+            "ambiguous": ambiguous,
+            "blocked_count": sum(1 for item in rows if item["blocked"]),
+            "existing_contest": session.get(ContestRow, parsed.contest_id) is not None,
+        }
+    finally:
+        if close_session:
+            session.close()
+
+
+def _preview_tier_name(
+    document: ContestJsonDocument, *, session: Session, repo_root: Path
+) -> str:
+    """预览只解析等级名，**不建等级**（写入阶段才 ensure）。"""
+    if document.tier:
+        found = find_tier_by_name(document.tier, session=session)
+        if found is not None:
+            return found.name
+        from xcpc_core.tier.service import builtin_config_entries, load_config_weights
+
+        for label, _coefficient in (load_config_weights(repo_root) or builtin_config_entries()).values():
+            if label == document.tier:
+                return label
+        raise ValueError(f"赛事等级不存在: {document.tier}")
+    if document.contest_type:
+        from xcpc_core.tier.service import builtin_config_entries, load_config_weights
+
+        config = load_config_weights(repo_root) or builtin_config_entries()
+        if document.contest_type not in config:
+            raise ValueError(f"未知赛事类型: {document.contest_type}（config 中无对应等级）")
+        return config[document.contest_type][0]
+    return "未分级"
 
 
 def import_contest_json(
