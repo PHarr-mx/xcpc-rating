@@ -52,6 +52,7 @@ _SECTIONS: dict[str, dict] = {
             {"key": "teams", "label": "队伍管理", "href": "/admin/teams"},
             {"key": "contests", "label": "比赛管理", "href": "/admin/contests"},
             {"key": "tiers", "label": "赛事等级", "href": "/admin/tiers"},
+            {"key": "rating", "label": "权重试算", "href": "/admin/rating"},
             {"key": "points", "label": "积分认证", "href": "/admin/points"},
             {"key": "audit", "label": "审计日志", "href": "/admin/audit"},
             {"key": "import", "label": "在线导入", "href": "/admin/import"},

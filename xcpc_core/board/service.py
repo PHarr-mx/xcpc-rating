@@ -23,6 +23,7 @@ from xcpc_core.board.models import (
 from xcpc_core.player.models import PlayerStatus
 from xcpc_core.player.store import PlayerStore
 from xcpc_core.rating.events import build_events_from_contests
+from xcpc_core.rating.formula_params import FormulaParams
 from xcpc_core.rating.models import PeriodFilter
 from xcpc_core.rating.replay import AtcoderReplayEngine
 
@@ -48,9 +49,12 @@ class BoardService:
         data_version: int = 0,
         algorithm: str = DEFAULT_ALGORITHM,
         generated_at: datetime | None = None,
+        params: FormulaParams | None = None,
     ) -> BoardSnapshot:
+        """``params`` 仅权重试算（P6）使用：传入草稿参数即在该参数下构榜，
+        不写库、不进缓存（缓存只挂在 ``board.api.board()`` 上）。"""
         period = period or PeriodFilter()
-        series = AtcoderReplayEngine().compute_series(
+        series = AtcoderReplayEngine(params=params).compute_series(
             build_events_from_contests(self.session),
             period=period,
         )

@@ -8,6 +8,7 @@ from xcpc_web.pages.admin.imports import admin_import
 from xcpc_web.pages.admin.overview import admin_overview
 from xcpc_web.pages.admin.players import admin_players
 from xcpc_web.pages.admin.points import admin_points
+from xcpc_web.pages.admin.rating import rating_lab_page
 from xcpc_web.pages.admin.teams import admin_teams
 from xcpc_web.pages.admin.tiers import admin_tiers
 from xcpc_web.pages.admin.users import admin_users
@@ -24,6 +25,7 @@ from xcpc_web.states.admin.imports import AdminImportState
 from xcpc_web.states.admin.overview import AdminOverviewState
 from xcpc_web.states.admin.players import AdminPlayersState
 from xcpc_web.states.admin.points import AdminPointsState
+from xcpc_web.states.admin.rating import RatingLabState
 from xcpc_web.states.admin.teams import AdminTeamsState
 from xcpc_web.states.admin.tiers import AdminTiersState
 from xcpc_web.states.admin.users import AdminUsersState
@@ -110,4 +112,11 @@ app.add_page(
     route="/admin/tiers",
     title="赛事等级",
     on_load=AdminTiersState.on_load,
+)
+
+app.add_page(
+    reflex_local_auth.require_login(rating_lab_page),
+    route="/admin/rating",
+    title="权重试算",
+    on_load=RatingLabState.on_load,
 )

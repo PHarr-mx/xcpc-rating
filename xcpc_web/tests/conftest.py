@@ -53,7 +53,8 @@ from xcpc_core.audit import api as audit_api  # noqa: E402
 from xcpc_core.board import api as board_api  # noqa: E402
 from xcpc_core.importer import api as importer_api  # noqa: E402
 from xcpc_core.rating import api as rating_api  # noqa: E402
-from xcpc_core.points import api as points_api  # noqa: E402
+from xcpc_core.points import api as points_api
+from xcpc_core.rating import lab as rating_lab  # noqa: E402
 from xcpc_core.tier import api as tier_api  # noqa: E402
 
 from xcpc_web.states.auth import AuthState  # noqa: E402
@@ -97,6 +98,7 @@ def core_store():
     board_api.configure_session(session)
     points_api.configure_session(session)
     tier_api.configure_session(session)
+    rating_lab.configure_session(session)
     yield session
     # 恢复默认（None → get_service 回落到真实库的默认 factory）
     player_api.configure_store(None)  # type: ignore[arg-type]
@@ -108,6 +110,7 @@ def core_store():
     board_api.configure_session(None)
     points_api.configure_session(None)
     tier_api.configure_session(None)
+    rating_lab.configure_session(None)
     session.close()
     Base.metadata.drop_all(engine)
     engine.dispose()
