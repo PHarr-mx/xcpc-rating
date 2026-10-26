@@ -133,9 +133,10 @@ BoardSnapshot(
 - 生成时间等 meta 展示在榜单页脚（含 data_version，供确认数据新鲜度）
 
 **选手历史（rating_history）**：`rating.api.player_event_history(player_id, mode=, session=)`（✅ 2026-09-11，P5）
-返回 `PlayerEventRecord` 列表——按 (date, event_id) 升序的逐场记录（比赛、名次/解题、贡献）+ 逐场累计
-`rating_after`（与榜单 placeholder 聚合语义一致）；测试注入用 `configure_session`（DI 镜像 importer/audit）。
-选手详情页消费；OJ/训练赛事件就绪后自动纳入。
+返回 `PlayerEventRecord` 列表——按 (date, event_id) 升序的逐场记录（比赛、名次/解题、奖项）+ 逐场
+`rating_delta`（该场 Rating 变化，首场相对 0 起点计）与 `rating_after`（累计到该场后的 Rating），
+与榜单同一套 AtCoder 重放语义；测试注入用 `configure_session`（DI 镜像 importer/audit）。
+选手详情页消费；OJ 事件就绪后自动纳入。
 
 ## 7. 缓存与失效（已实装）
 

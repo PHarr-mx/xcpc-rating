@@ -16,7 +16,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 |----|------|
 | 框架 | Reflex **0.9.7 锁版本**（升级作独立任务） |
 | 组件包 | `reflex-components-core` + `-lucide`（随 Reflex 分包，独立版本） |
-| 图表 | `reflex-components-plotly`（⬜ 未引入，随详情页） |
+| 图表 | Reflex 内置 `rx.recharts`（✅ 已用于 `/players/{id}`；**未引入 plotly**，`reflex-components-plotly` 仅为 reflex 元包的传递依赖） |
 | 认证 | `reflex-local-auth` 0.5.0 |
 | 手写 JS/TS | **无** |
 
@@ -48,7 +48,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `/admin/import` | xlsx 在线导入五步 | admin | ✅ |
 | `/players/{player_id}` | 选手详情：档案 + OJ 外链 + Rating 曲线 + 参赛记录；绑定本人显示「编辑我的资料」 | guest | ✅ 2026-09-11 |
 | `/contests/{contest_id}` | 比赛详情：元信息行 + 成绩表按 format 切列（xcpc：解题/罚时；oi：得分）；队员姓名解析、打星标记、奖项中文 | guest | ✅ 2026-09-14 |
-| `/admin/rating` | 权重试算 | admin | ⬜（P6，前置四期公式） |
+| `/admin/rating` | 权重试算 | admin | ⬜（P6，前置公式已定案） |
 
 路由注册：`xcpc_web/xcpc_web.py`（`app.add_page`，含各页 `on_load`）。
 
@@ -60,7 +60,7 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `BoardState` | 榜单页（mode/period/search/sort + URL query 同步） | ✅ |
 | `ProfileState` | 自助改资料、OJ 账号、绑定申请 | ✅ |
 | `AdminState`（基类） | 权限守卫 `_require_admin()` | ✅ |
-| `AdminOverview/Users/Players/Teams/Contests/Audit/ImportState` | 管理后台各页 | ✅ |
+| `AdminOverview/Users/Players/Teams/Contests/Tiers/Points/Audit/ImportState` | 管理后台 9 页 | ✅ |
 | `PlayerDetailState` / `ContestDetailState` | 详情页（均 ✅：选手 2026-09-11、比赛 2026-09-14） | ✅ |
 | `RatingLabState` | 权重试算（draft_weights / preview_rows / diff_vs_current） | ⬜ |
 
@@ -76,7 +76,9 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 - **`/about`**：数据与赛季说明静态页。
 - 组件：`layout.py`（page_shell：导航 + 内容 + 页脚）、`board_table.py`、`period_selector.py`。
 
-## 6. 待建页面与组件
+## 6. 页面与组件实现要点
+
+> 本表原为「待建清单」，P5 落地后转为**实现要点记录**（仅 `/admin/rating` 仍待建）。
 
 | 项 | 设计要点 |
 |----|----------|
@@ -86,11 +88,11 @@ State 只做「读表单 → 调 `xcpc_core` API → 转视图模型 → 写 sta
 | `oj_link.py` ✅ | 平台 profile 外链；URL 与展示文案在 State 侧预算成视图 dict（Var 不能构建期逐项分支；url 空串表示无链，避免 rx.cond 分支构建期 href=None 报错） |
 | ~~`form_fields.py`~~ | 已取消：P5 各页无需抽象表单控件，admin 页各有表单模式，避免无用抽象 |
 | `rating_chart.py` ✅ | Rating 累计折线。**用 Reflex 内置 recharts 替代原计划的 plotly**——单折线场景够用、零新增依赖、无产物体积负担 |
-| `/admin/rating` | 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump data_version + 记 `weights.apply` 审计（⬜） |
+| `/admin/rating` ⬜ | 左调权重右看 diff；试算不落库不进缓存，「应用」才写 YAML + bump data_version + 记 `weights.apply` 审计（P6 待建） |
 
 动态路由要点：`route="/players/[player_id]"`；参数运行时合并进 `router.page.params`（与 query 同通道），`on_load` 读取；`is_self` 直接读路由参数不依赖 on_load 时序。
 
-**错误与加载态**：数据加载 `rx.skeleton`；资源不存在 404 + 返回榜单；表单校验失败展示 core 异常消息（字段级）；WebSocket 断开用 Reflex 内置重连。**性能**：校内规模全量渲染一次即可，超 2000 行再考虑虚拟滚动；Plotly 仅详情页引入。
+**错误与加载态**：数据加载 `rx.skeleton`；资源不存在 404 + 返回榜单；表单校验失败展示 core 异常消息（字段级）；WebSocket 断开用 Reflex 内置重连。**性能**：校内规模全量渲染一次即可，超 2000 行再考虑虚拟滚动；图表仅详情页引入。
 
 ## 7. 认证与权限（已实现）
 
@@ -142,9 +144,12 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 ### 7.5 审计
 
 所有写操作落 `auditlog`（`xcpc_core/audit/api.py`，best-effort 跨库写，失败不回滚业务）：
-`player.create|update|delete`、`player.oj.add|remove`、`team.create|update|delete`、
-`contest.delete`、`import.confirm`、`binding.approve|reject`、（待建）`weights.apply`、`user.role.change`。
+`player.create|update|delete`、`team.create|update|delete`、`contest.create|delete`、
+`import.confirm`、`binding.approve|reject`、`points.approve|reject`；
+（待建）`weights.apply`。
 `diff_json` 只存变化字段；`/admin/audit` 按 user/action/日期筛选。
+
+> 现状备注（2026-10-26）：`/admin/tiers` 的等级与奖项 CRUD **未接审计**；OJ 账号编辑与角色变更也无独立审计动作（`player.oj.*`、`user.role.change` 为原设计预留名，代码中不存在）。
 
 ## 8. Web 测试基建
 
@@ -164,9 +169,9 @@ member 的写权限严格限定在服务端从 session 推出的 `bound_player_i
 | 包含（已实现/规划） | 明确不包含 |
 |----------------------|------------|
 | 榜单页 + 筛选/搜索/URL 分享、选手/比赛详情、登录注册绑定、全部 admin 页 | 队伍详情页（再议） |
-| 审计日志、Plotly Rating 曲线 | 深色模式 |
-| 权重试算（P6） | OJ 数据在线导入 |
-| 密码重置（CLI 已有；admin UI 待定） | 训练赛在线录入（随四期） |
+| 审计日志、recharts Rating 曲线 | 深色模式（当前为固定暗色主题） |
+| 权重试算（P6，待建） | OJ 数据在线导入 |
+| 密码重置（CLI 已有；admin UI 待定） | 训练赛在线录入（随 P-U3） |
 
 开放问题（详见 08 路线图）：注册限制（邀请码/域名，公网前必须定）、密码找回 UI、上传文件大小上限（建议 10MB）、`retired` 绑定用户保留写权限 / `left` 自动解绑（建议状态）。
 
